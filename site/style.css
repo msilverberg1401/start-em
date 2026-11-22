@@ -878,3 +878,13 @@ html[data-theme="dark"] .matchup .quick-share { background: var(--surface); }
 .prow, .prow { grid-template-columns: 1fr auto auto; }
 @media (max-width: 640px) { .prow { grid-template-columns: 1fr auto auto; } }
 .face.mark { background: #fff; color: #0B1220; font-family: var(--display); font-weight: 900; font-style: italic; font-size: 30px; letter-spacing: -.01em; }
+
+/* video share */
+#makevideo { width: 100%; max-width: 380px; margin: 0 0 10px; gap: 10px; }
+@media (max-width: 900px) { #makevideo { margin-left: auto; margin-right: auto; } }
+.vid-make .track { height: 10px; background: var(--line-2); border-radius: 5px; overflow: hidden; }
+.vid-make .fill { height: 100%; width: 0; background: var(--yel); transition: width .2s linear; }
+.vid-wrap { display: grid; gap: 16px; }
+.vid-prev { width: 100%; max-height: 60vh; aspect-ratio: 9 / 16; object-fit: contain; background: #0D1A2B; border-radius: 8px; }
+.vid-acts { display: grid; gap: 10px; }
+.vid-acts .btn { width: 100%; }

@@ -648,6 +648,7 @@
         <div class="share-side">
           <h3>Your card</h3>
           <p>Save it for your story, or copy the text for a group chat${g.mode === "daily" ? ". A challenge link sends friends to today's Daily" : ""}.</p>
+          ${StartEmShare.canVideo() ? `<button class="btn yel" id="makevideo"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="14" height="14" rx="2"></rect><path d="M16 10l6-3v10l-6-3z"></path></svg>Make a video for TikTok or Reels</button>` : ""}
           <div class="share-more">
             <button class="btn ghost" id="copytext">Copy text</button>
             <button class="btn ghost" id="saveimg">Save image</button>
@@ -692,6 +693,7 @@
       try { if (navigator.share) return await navigator.share({ text: msg, title: "Start 'Em challenge" }); } catch (e) { if (e.name === "AbortError") return; }
       try { await navigator.clipboard.writeText(msg); toast("Challenge link copied. Send it to a friend."); } catch { toast(link); }
     });
+    $("#makevideo")?.addEventListener("click", () => videoSheet(g, shareLink));
     $("#share").addEventListener("click", () => shareSheet({ card, file, text, copyText, saveImg }));
     $("#shareimg").addEventListener("click", () => shareSheet({ card, file, text, copyText, saveImg }));
   }
@@ -777,6 +779,37 @@
       if (x.mine?.played === "daily") return toast("You played this one the day it came out.");
       start("archive", x.date);
     }));
+  }
+
+  // ================= VIDEO FOR TIKTOK / REELS =================
+  async function videoSheet(g, link) {
+    const s = sheet(`
+      <h2 class="sheet-h">Your Start 'Em video</h2>
+      <div class="vid-wrap">
+        <div class="vid-make"><p class="sheet-lede">Making your 9-second video. Keep this page open.</p><div class="track"><div class="fill" id="vidfill"></div></div></div>
+      </div>`, { wide: true });
+    const wrap = $(".vid-wrap", s.el);
+    let out;
+    try {
+      out = await StartEmShare.video({ game: g, url: link, teamColors: COLORS, onProgress: (k) => { const f = $("#vidfill", s.el); if (f) f.style.width = `${Math.round(k * 100)}%`; } });
+    } catch (e) { wrap.innerHTML = `<p class="sheet-lede">${esc(e.message || "Couldn't make the video here.")}</p>`; return; }
+    if (!document.body.contains(s.el)) return; // closed while recording
+    const name = `start-em-${g.mode}${g.number ? `-${g.number}` : ""}.${out.ext}`;
+    const file = new File([out.blob], name, { type: out.mime });
+    const url = URL.createObjectURL(out.blob);
+    const canShare = !!navigator.canShare?.({ files: [file] });
+    wrap.innerHTML = `
+      <video class="vid-prev" src="${url}" autoplay muted loop playsinline></video>
+      <div class="vid-acts">
+        ${canShare ? `<button class="btn yel big" data-vshare>Share video</button><p class="hint">Pick TikTok, Instagram or Snapchat from your share menu.</p>` : ""}
+        <button class="btn ${canShare ? "ghost" : "yel big"}" data-vsave>Save video</button>
+        ${out.ext === "webm" ? `<p class="hint">Saved as a .webm file. If an app won't take it, use Save image instead.</p>` : ""}
+      </div>`;
+    $("[data-vshare]", s.el)?.addEventListener("click", async () => {
+      try { await navigator.share({ files: [file], title: "Start 'Em" }); }
+      catch (e) { if (e.name !== "AbortError") toast("Couldn't share the video here. Try Save video."); }
+    });
+    $("[data-vsave]", s.el).addEventListener("click", () => { const a = document.createElement("a"); a.href = url; a.download = name; a.click(); });
   }
 
   // ================= SHARE POP-UP =================

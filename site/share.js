@@ -96,6 +96,138 @@ window.StartEmShare = (() => {
     return new Promise((res) => cv.toBlob((b) => res({ blob: b, dataUrl: cv.toDataURL("image/png") }), "image/png"));
   }
 
+
+  // ---- 9-second vertical video (1080x1920) for TikTok / Reels / Stories ----
+  // Drawn on a canvas and recorded in real time with MediaRecorder. No audio.
+  const videoType = () => {
+    if (typeof MediaRecorder === "undefined" || !HTMLCanvasElement.prototype.captureStream) return null;
+    for (const t of ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]) {
+      try { if (MediaRecorder.isTypeSupported(t)) return t; } catch {}
+    }
+    return null;
+  };
+  const canVideo = () => !!videoType();
+
+  async function video({ game, url, teamColors, onProgress }) {
+    const type = videoType();
+    if (!type) throw new Error("This browser can't make videos. Try Chrome or Safari.");
+    await fonts();
+    const r = game.result, W = 1080, H = 1920, FPS = 30, DUR = 9.2;
+    const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    const ctx = cv.getContext("2d");
+    const picks = game.picks; // in the order they were picked: that's the story
+    const ease = (x) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
+    const T0 = 0.9, STEP = 0.72, END = T0 + picks.length * STEP; // picks land 0.9s .. ~5.9s
+    const modeLine = game.mode === "daily" ? `DAILY #${game.number}${game.theme ? ` · ${game.theme.name.toUpperCase()}` : ""}` : game.mode === "archive" ? `DAILY #${game.number}` : game.mode === "ranked" ? "RANKED" : game.mode === "challenge" ? "CHALLENGE" : "CASUAL";
+    const site = url.replace(/^https?:\/\//, "").replace(/[?#].*$/, "").replace(/\/c\/.*$/, "").replace(/\/(index\.html)?$/, "");
+
+    function frame(t) {
+      // background: navy with the turf field in the middle
+      ctx.fillStyle = C.navy; ctx.fillRect(0, 0, W, H);
+      const FT = 640, FB = 1690, bands = 12, bh = (FB - FT) / bands;
+      for (let i = 0; i < bands; i++) { ctx.fillStyle = i % 2 ? C.turf2 : C.turf; ctx.fillRect(0, FT + i * bh, W, bh); }
+      ctx.fillStyle = "rgba(255,255,255,.45)"; for (let i = 1; i < bands; i++) ctx.fillRect(0, FT + i * bh - 2, W, 3);
+
+      // logo + mode
+      ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+      ctx.font = `italic 900 104px ${DISP}`; ctx.fillStyle = "#fff"; ctx.fillText("START", 70, 170);
+      const sw = ctx.measureText("START").width, ew = ctx.measureText("'EM").width;
+      slant(ctx, 70 + sw + 16, 80, ew + 56, 112, 18, C.yel); ctx.fillStyle = C.ink; ctx.fillText("'EM", 70 + sw + 32, 170);
+      ctx.fillStyle = C.steel; ctx.font = `800 44px ${DISP}`; ctx.fillText(fit(ctx, modeLine, W - 140), 70, 248);
+
+      // scoreboard: running total
+      const landed = picks.filter((_, i) => t >= T0 + i * STEP + 0.45);
+      let total = landed.reduce((a, p) => a + p.player.pts, 0);
+      const cur = picks.findIndex((_, i) => t >= T0 + i * STEP && t < T0 + i * STEP + 0.45);
+      if (cur >= 0) total += picks[cur].player.pts * ease((t - T0 - cur * STEP) / 0.45);
+      const sy = 300, sh = 290;
+      round(ctx, 70, sy, W - 140, sh, 16, C.board);
+      ctx.save(); ctx.beginPath(); ctx.roundRect(70, sy, W - 140, sh, 16); ctx.clip();
+      ctx.fillStyle = C.dots; for (let y = sy + 8; y < sy + sh; y += 14) for (let x = 78; x < W - 70; x += 14) { ctx.beginPath(); ctx.arc(x, y, 2.2, 0, 7); ctx.fill(); }
+      ctx.restore();
+      ctx.fillStyle = C.steel; ctx.font = `700 36px ${DISP}`; ctx.fillText("TOTAL PPR", 110, sy + 62);
+      const done = t >= END + 0.2, pulse = done ? 1 + 0.04 * Math.sin(Math.min(1, (t - END - 0.2) / 0.5) * Math.PI) : 1;
+      ctx.save(); ctx.translate(100, sy + 252); ctx.scale(pulse, pulse);
+      ctx.font = `900 172px ${DOTS}`; ctx.fillStyle = C.yel; ctx.shadowColor = "rgba(255,190,0,.7)"; ctx.shadowBlur = 34;
+      ctx.fillText((done ? r.total : total).toFixed(1), 0, 0); ctx.restore(); ctx.shadowBlur = 0;
+
+      // pick rows, sliding in one at a time
+      const rh = 118, gap = 22, top = FT + 34;
+      picks.forEach((p, i) => {
+        const k = ease((t - T0 - i * STEP) / 0.3);
+        const y = top + i * (rh + gap);
+        if (k <= 0) { // empty spot waiting
+          ctx.fillStyle = "rgba(0,0,0,.28)"; ctx.fillRect(70, y, W - 140, rh);
+          ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.font = `italic 900 46px ${DISP}`; ctx.fillText(LABEL[p.slot], 160, y + 76);
+          return;
+        }
+        const x = 70 + (1 - k) * (W + 40);
+        const col = (teamColors[p.team] || ["#556"])[0];
+        ctx.shadowColor = "rgba(0,0,0,.35)"; ctx.shadowBlur = 18; ctx.shadowOffsetY = 8;
+        round(ctx, x, y, W - 140, rh, 8, "#fff");
+        ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+        ctx.fillStyle = col; ctx.fillRect(x, y, 14, rh);
+        ctx.textAlign = "center"; ctx.fillStyle = C.ink; ctx.font = `italic 900 ${p.slot === "FLEX" ? 40 : 50}px ${DISP}`; ctx.fillText(LABEL[p.slot], x + 92, y + 76);
+        ctx.textAlign = "left"; ctx.font = `700 42px ${BODY}`; ctx.fillText(fit(ctx, p.player.name, 560), x + 178, y + 56);
+        ctx.fillStyle = C.ink3; ctx.font = `600 29px ${BODY}`; ctx.fillText(fit(ctx, `${p.season} ${p.teamName}`, 560), x + 178, y + 96);
+        const pk = ease((t - T0 - i * STEP - 0.1) / 0.4);
+        ctx.textAlign = "right"; ctx.fillStyle = C.ink; ctx.font = `italic 900 64px ${DISP}`;
+        ctx.fillText((p.player.pts * pk).toFixed(1), x + W - 140 - 72, y + 80);
+        if (pk >= 1) { ctx.fillStyle = GRADE[p.grade]; ctx.beginPath(); ctx.arc(x + W - 140 - 36, y + rh / 2, 14, 0, 7); ctx.fill(); }
+      });
+
+      // footer
+      ctx.fillStyle = C.navy; ctx.fillRect(0, FB, W, H - FB);
+      slant(ctx, 0, FB, W * 0.42, 10, 10, C.yel);
+      ctx.textAlign = "left"; ctx.fillStyle = C.yel; ctx.font = `italic 900 64px ${DISP}`; ctx.fillText("CAN YOU BEAT IT?", 70, FB + 110);
+      ctx.fillStyle = "#fff"; ctx.font = `700 44px ${BODY}`; ctx.fillText(site, 70, FB + 180);
+
+      // intro title over everything for the first second
+      if (t < T0) {
+        const a = t < 0.65 ? 1 : 1 - (t - 0.65) / (T0 - 0.65);
+        ctx.fillStyle = `rgba(13,26,43,${0.82 * a})`; ctx.fillRect(0, FT, W, FB - FT);
+        ctx.globalAlpha = a; ctx.textAlign = "center"; ctx.fillStyle = "#fff"; ctx.font = `italic 900 120px ${DISP}`;
+        ctx.fillText("WHO ARE YOU", W / 2, FT + 440); ctx.fillStyle = C.yel; ctx.fillText("STARTING?", W / 2, FT + 570); ctx.globalAlpha = 1;
+      }
+
+      // finale: record badge + squares pop in over the scoreboard's right side
+      if (t >= END + 0.15) {
+        const k = ease((t - END - 0.15) / 0.35);
+        ctx.save(); ctx.globalAlpha = k;
+        ctx.font = `italic 900 50px ${DISP}`;
+        const badge = `${r.record.wins}-${r.record.losses} SEASON`, bw = ctx.measureText(badge).width + 56;
+        slant(ctx, W - 70 - bw - 20, sy + 22, bw, 70, 16, r.record.wins === 14 ? C.best : C.yel);
+        ctx.textAlign = "left"; ctx.fillStyle = r.record.wins === 14 ? "#fff" : C.ink; ctx.fillText(badge, W - 70 - bw - 20 + 20, sy + 73);
+        // pick squares up in the header, right-aligned on the mode line
+        const ordered = [...picks].sort((a, b) => ORDER.indexOf(a.slot) - ORDER.indexOf(b.slot));
+        ordered.forEach((p, i) => round(ctx, W - 70 - (7 - i) * 54 + 12, 208, 42, 42, 8, GRADE[p.grade]));
+        ctx.restore();
+      }
+    }
+
+    const stream = cv.captureStream(FPS);
+    const rec = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 6_000_000 });
+    const chunks = [];
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    const stopped = new Promise((res) => { rec.onstop = res; });
+    frame(0); rec.start(250);
+    const start = performance.now();
+    await new Promise((res) => {
+      const tick = () => {
+        const t = (performance.now() - start) / 1000;
+        frame(Math.min(t, DUR));
+        onProgress?.(Math.min(1, t / DUR));
+        if (t >= DUR) return res();
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    rec.stop(); stream.getTracks().forEach((tr) => tr.stop());
+    await stopped;
+    const mime = type.split(";")[0], ext = mime === "video/mp4" ? "mp4" : "webm";
+    return { blob: new Blob(chunks, { type: mime }), mime, ext };
+  }
+
   function text({ game, url }) {
     const r = game.result;
     const grid = [...game.picks].sort((a, b) => ORDER.indexOf(a.slot) - ORDER.indexOf(b.slot)).map((p) => ({ best: "🟩", close: "🟨", miss: "🟥" })[p.grade]).join("");
@@ -103,5 +235,5 @@ window.StartEmShare = (() => {
     return `${title} 🏈\n${r.total.toFixed(1)} PPR · ${r.record.wins}-${r.record.losses} season\n${grid}\nCan you beat it? ${url}`;
   }
 
-  return { draw, text };
+  return { draw, text, video, canVideo };
 })();
