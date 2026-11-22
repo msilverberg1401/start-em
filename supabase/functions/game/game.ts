@@ -92,7 +92,10 @@ export function themePool(theme) {
 // repo could compute future Dailies. Set it once before launch and never change it, or past Dailies reshuffle.
 const DAILY_SALT = globalThis.Deno?.env.get("DAILY_SALT") ?? globalThis.__SE_SALT ?? "";
 if (globalThis.Deno && !DAILY_SALT) console.error("DAILY_SALT is not set: Dailies are predictable from the public code.");
-export const dailyQueue = (date) => rollQueue(`daily-${date}|${DAILY_SALT}`, 11, themePool(themeFor(date)));
+// Daily #1 (launch day) was played before the salt existed, so it keeps its original rolls.
+const SALT_FROM = "2026-11-23";
+export const dailyQueue = (date) =>
+  rollQueue(date < SALT_FROM ? `daily-${date}|` : `daily-${date}|${DAILY_SALT}`, 11, themePool(themeFor(date)));
 export const publicTheme = (t) => t && { key: t.key, name: t.name, desc: t.desc };
 
 // Reroll the current roll. kind "team": same season, another team. kind "year": same franchise, another season.
