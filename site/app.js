@@ -45,8 +45,8 @@
     const t = $("#toast"); t.textContent = msg; t.classList.add("show");
     clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 3000);
   }
-  const initials = (n) => n.split(" ").map((w) => w[0]).slice(0, 2).join("");
-  const face = (p) => `<span class="face">${p.head ? `<img src="${esc(p.head)}" alt="" loading="lazy" onerror="this.parentNode.textContent='${esc(initials(p.name))}'">` : esc(initials(p.name))}</span>`;
+  // big position tile on the reveal card (no headshots: we can't get one for every player, so nobody gets one)
+  const posTile = (pos) => `<span class="face mark" aria-hidden="true">${pos}</span>`;
   const bulbNum = (n, width = 5) => {
     const s = Number(n).toFixed(1);
     const pad = Math.max(0, width - s.replace(".", "").length);
@@ -492,7 +492,6 @@
             <div class="sub">${hints ? "Stats on: how much the ball came his way each game, and games played. Yards and touchdowns are up to you." : g.rules?.deep ? "Deep roster. Pick one player. His stats stay hidden until he's in your lineup." : "Pick one player. His stats stay hidden until he's in your lineup."}</div>
             ${groups.map(([pos, ps]) => !ps.length ? "" : !open.some((s) => accepts(s, pos)) ? `<h4 class="filled-pos">${POS_NAME[pos]} <span>${pos} spot${pos === "RB" || pos === "WR" ? "s" : ""} filled</span></h4>` : `<h4>${POS_NAME[pos]}</h4>${ps.map((p) => `
               <button class="prow" style="--pc:${PC[pos]}" data-pid="${esc(p.id)}" aria-pressed="${selected?.id === p.id}" ${usable(p) ? "" : "disabled"}>
-                ${face(p)}
                 <span><span class="nm">${esc(p.name)}</span>${p.taken ? `<span class="meta"><br>Already in your lineup</span>` : hints ? ` <span class="gms">${p.g} ${p.g === 1 ? "game" : "games"}</span><br><span class="usage">${usageText(p)}</span>` : usable(p) ? "" : `<span class="meta"><br>${pos} spot filled</span>`}</span>
                 <span class="pos p-${pos}">${pos}</span>
                 <span class="go">Start</span>
@@ -562,7 +561,7 @@
     const ov = document.createElement("div");
     ov.className = "reveal-wrap";
     ov.innerHTML = `<div class="card" role="dialog" aria-modal="true" aria-label="${esc(pl.name)} scored ${pl.pts} points" style="--team:${t1};--team-2:${t2}">
-      <div class="card-top">${face(pl)}<div><div class="nm">${esc(pl.name)}</div><div class="sub">${pk.season} ${esc(pk.teamName)} · ${pk.slot === "FLEX" ? `FLEX (${pl.pos})` : pl.pos}</div></div></div>
+      <div class="card-top">${posTile(pl.pos)}<div><div class="nm">${esc(pl.name)}</div><div class="sub">${pk.season} ${esc(pk.teamName)} · ${pk.slot === "FLEX" ? `FLEX (${pl.pos})` : pl.pos}</div></div></div>
       <div class="card-pts"><div class="big" id="cardpts">0.0</div><div class="unit">PPR points</div></div>
       <div class="card-stats">
         <div><b>${pl.ppg.toFixed(1)}</b>Per game</div>
@@ -630,11 +629,11 @@
           const a = mine[s], b = perf[s];
           const same = a.player.id === b.player.id;
           return `<div class="mrow">
-            <div class="pl">${face(a.player)}<div><div class="nm"><span class="dot d-${a.grade}"></span>${esc(a.player.name)}</div><div class="yr">${a.season} ${esc(a.team)} <b>· ${a.player.pts.toFixed(1)}</b></div></div></div>
+            <div class="pl"><div><div class="nm"><span class="dot d-${a.grade}"></span>${esc(a.player.name)}</div><div class="yr">${a.season} ${esc(a.team)} <b>· ${a.player.pts.toFixed(1)}</b></div></div></div>
             <span class="pt ${same ? "same" : ""}">${a.player.pts.toFixed(1)}</span>
             <span class="mid"><span class="pos p-${SLOT_LABEL[s]}">${SLOT_LABEL[s]}</span></span>
             <span class="pt r">${b.player.pts.toFixed(1)}</span>
-            <div class="pl r">${face(b.player)}<div><div class="nm">${esc(b.player.name)}</div><div class="yr">${b.season} ${esc(b.rollKey.split("-")[1])} <b>· ${b.player.pts.toFixed(1)}</b></div></div></div>
+            <div class="pl r"><div><div class="nm">${esc(b.player.name)}</div><div class="yr">${b.season} ${esc(b.rollKey.split("-")[1])} <b>· ${b.player.pts.toFixed(1)}</b></div></div></div>
           </div>`;
         }).join("")}
         </div>

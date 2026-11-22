@@ -874,3 +874,7 @@ html[data-theme="dark"] .matchup .quick-share { background: var(--surface); }
 .prow .gms { font-size: 12.5px; font-weight: 600; color: var(--ink-3); margin-left: 4px; white-space: nowrap; }
 .prow .usage { white-space: nowrap; }
 .play > section, .play > aside, .chy .slab, .chy .tn { min-width: 0; }
+/* no headshots: player rows drop the photo column; the reveal card shows a position tile */
+.prow, .prow { grid-template-columns: 1fr auto auto; }
+@media (max-width: 640px) { .prow { grid-template-columns: 1fr auto auto; } }
+.face.mark { background: #fff; color: #0B1220; font-family: var(--display); font-weight: 900; font-style: italic; font-size: 30px; letter-spacing: -.01em; }

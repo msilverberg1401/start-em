@@ -1,10 +1,6 @@
 // @ts-nocheck
 import rolls from "./rolls.json" with { type: "json" };
 
-// rolls.json stores headshots as "p:<id>" / "u:<id>" to stay small; expand once at load
-const HEAD = { "p:": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/", "u:": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/" };
-for (const r of rolls) for (const p of r.players) if (p.head && HEAD[p.head.slice(0, 2)]) p.head = HEAD[p.head.slice(0, 2)] + p.head.slice(2);
-
 export const ROLLS = rolls;
 const BY_KEY = new Map(rolls.map((r) => [r.key, r]));
 export const getRoll = (k) => BY_KEY.get(k);
@@ -128,14 +124,14 @@ export function publicRoll(key, rules, taken = new Set()) {
     players: r.players.filter((p) => visible(p, rules)).sort((a, b) =>
       a.pos.localeCompare(b.pos) || a.name.split(" ").slice(1).join(" ").localeCompare(b.name.split(" ").slice(1).join(" ")) || a.name.localeCompare(b.name)
     ).map((p) => {
-      const o = { id: p.id, name: p.name, pos: p.pos, head: p.head };
+      const o = { id: p.id, name: p.name, pos: p.pos };
       if (taken.has(p.id)) o.taken = true;
       if (hints) { o.g = p.g; o.yr = p.yr; o.u = p.u; }
       return o;
     }),
   };
 }
-export const reveal = (p) => ({ id: p.id, name: p.name, pos: p.pos, head: p.head, pts: p.pts, ppg: p.ppg, g: p.g, rank: p.rank });
+export const reveal = (p) => ({ id: p.id, name: p.name, pos: p.pos, pts: p.pts, ppg: p.ppg, g: p.g, rank: p.rank });
 
 // ---------- scoring ----------
 const bestFor = (roll, slot, exclude = new Set()) => {

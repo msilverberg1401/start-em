@@ -22,7 +22,7 @@ def team_name(t, y):
 
 frames=[]
 for f in sorted(glob.glob(os.path.join(src,'w_*.csv'))):
-    d=pd.read_csv(f,low_memory=False,usecols=['player_id','player_display_name','position','season','week','season_type','team','game_id','fantasy_points_ppr','headshot_url','attempts','carries','receptions'])
+    d=pd.read_csv(f,low_memory=False,usecols=['player_id','player_display_name','position','season','week','season_type','team','game_id','fantasy_points_ppr','attempts','carries','receptions'])
     d=d[(d.season_type=='REG') & d.position.isin(POS)]
     frames.append(d)
 w=pd.concat(frames,ignore_index=True); w['pos']=w.position.map(POS)
@@ -50,7 +50,7 @@ w['team']=pd.Series(fixed)
 
 # per player-team-season (stint)
 g=(w.groupby(['season','team','player_id']).agg(name=('player_display_name','last'),pos=('pos','last'),
-     pts=('fantasy_points_ppr','sum'),games=('week','nunique'),head=('headshot_url','last'),
+     pts=('fantasy_points_ppr','sum'),games=('week','nunique'),
      att=('attempts','sum'),car=('carries','sum'),rec=('receptions','sum')).reset_index())
 # a player's primary position for the season
 g['pos']=g.groupby(['season','player_id']).pos.transform(lambda s:s.mode().iat[0])
@@ -89,17 +89,10 @@ for (y,t),grp in g.groupby(['season','team']):
             tier = 'elite' if sr<=a else 'starter' if sr<=b else 'flex' if sr<=c else 'depth'
             players.append(dict(id=r.player_id,name=r.name,pos=p,pts=round(float(r.pts),1),g=int(r.games),
                 ppg=round(float(r.pts)/max(int(r.games),1),1),rank=int(r.rank),tier=tier,
-                head=r.head if isinstance(r.head,str) else None, d=d,
+                d=d,
                 yr=(int(r.yr) if r.yr==r.yr else None),
                 # usage per game for Casual's stats-on view (opportunity, not results)
                 u=usage(p, r)))
     rolls.append(dict(key=f'{y}-{abbr}',season=int(y),team=abbr,teamName=full,players=players))
-# shorten headshot URLs: game.ts expands "p:"/"u:" back to the full nfl.com address
-PRE={'https://static.www.nfl.com/image/private/f_auto,q_auto/league/':'p:','https://static.www.nfl.com/image/upload/f_auto,q_auto/league/':'u:'}
-for r in rolls:
-    for pl in r['players']:
-        h=pl.get('head')
-        for full,short in PRE.items():
-            if h and h.startswith(full): pl['head']=short+h[len(full):]
 json.dump(rolls,open(out,'w'),separators=(',',':'))
 print(len(rolls),'team-seasons', os.path.getsize(out)//1024,'KB')
