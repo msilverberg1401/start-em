@@ -17,7 +17,7 @@ jobs:
         with: { version: latest }
       - run: supabase link --project-ref "$PROJECT_REF"
       - name: Apply database migrations
-        run: supabase db push
+        run: supabase db push --remote
       - name: Deploy functions
         run: |
           supabase functions deploy game --project-ref "$PROJECT_REF" --no-verify-jwt
