@@ -1,0 +1,16 @@
+{
+  "name": "Start 'Em",
+  "short_name": "Start 'Em",
+  "description": "Roll random NFL teams, start one player from each, and build the best full-PPR lineup.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0D1A2B",
+  "theme_color": "#0D1A2B",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

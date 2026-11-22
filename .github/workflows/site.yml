@@ -1,0 +1,39 @@
+name: Deploy site to GitHub Pages
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", ".github/workflows/site.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency: { group: pages, cancel-in-progress: true }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: { name: github-pages, url: "${{ steps.deploy.outputs.page_url }}" }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write config.js from repo variables
+        if: ${{ vars.SUPABASE_URL != '' }}
+        run: |
+          cat > site/config.js <<JS
+          window.START_EM_CONFIG = {
+            supabaseUrl: "${{ vars.SUPABASE_URL }}",
+            supabaseAnonKey: "${{ vars.SUPABASE_ANON_KEY }}",
+            siteUrl: "${{ vars.SITE_URL }}",
+            shareBase: "${{ vars.SHARE_BASE }}",
+            vapidPublicKey: "${{ vars.VAPID_PUBLIC_KEY }}",
+          };
+          JS
+      - name: Fill in the site URL for link previews
+        run: |
+          URL="${{ vars.SITE_URL }}"
+          [ -n "$URL" ] && case "$URL" in */) ;; *) URL="$URL/";; esac
+          sed -i "s#%SITE_URL%#${URL}#g" site/index.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site }
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,9 @@
+project_id = "start-em"
+
+[functions.game]
+# The function checks the caller itself: logged-out players can play Casual and read leaderboards.
+verify_jwt = false
+
+[functions.reminders]
+# called by pg_cron with a shared secret header, not by browsers
+verify_jwt = false

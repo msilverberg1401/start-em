@@ -1,0 +1,85 @@
+// @ts-nocheck
+// Supabase-backed storage for the game API (service role: bypasses RLS, never exposed to browsers).
+export function makeStore(sb) {
+  const one = async (q) => { const { data, error } = await q; if (error) throw error; return data; };
+  const num = (r, ...keys) => { for (const k of keys) if (r[k] != null) r[k] = Number(r[k]); return r; };
+  return {
+    getProfile: (id) => one(sb.from("profiles").select("*").eq("id", id).maybeSingle()),
+    async createProfile(id, username) {
+      const { error } = await sb.from("profiles").insert({ id, username });
+      if (error?.code === "23505") return false; // username taken
+      if (error) throw error;
+      return true;
+    },
+    // anonymous casual/challenge games are throwaway; prune ones older than 2 days so the free database stays small
+    cleanupCasual: async () => { await sb.from("games").delete().is("user_id", null).lt("created_at", new Date(Date.now() - 2 * 864e5).toISOString()); },
+    getGame: (id) => one(sb.from("games").select("*").eq("id", id).maybeSingle()),
+    async findGame(where) {
+      let q = sb.from("games").select("*");
+      for (const [k, v] of Object.entries(where)) q = q.eq(k, v);
+      return one(q.order("created_at", { ascending: false }).limit(1).maybeSingle());
+    },
+    insertGame: (g) => one(sb.from("games").insert(g).select().single()),
+    updateGame: (g) => one(sb.from("games").update({ status: g.status, state: g.state, updated_at: new Date().toISOString() }).eq("id", g.id).select().single()),
+
+    getDaily: (date, uid) => one(sb.from("daily_results").select("total,pct,grid").eq("play_date", date).eq("user_id", uid).maybeSingle()),
+    putDaily: (row) => one(sb.from("daily_results").upsert(row)),
+    async dailyDates(uid) { return (await one(sb.from("daily_results").select("play_date").eq("user_id", uid).order("play_date", { ascending: false }).limit(400))).map((r) => r.play_date); },
+    async dailyHistory(uid, n) { return (await one(sb.from("daily_results").select("play_date,total,pct,grid").eq("user_id", uid).order("play_date", { ascending: false }).limit(n))).map((r) => num(r, "total", "pct")); },
+    getRanked: (uid) => one(sb.from("ranked_stats").select("*").eq("user_id", uid).maybeSingle()),
+    putRanked: (row) => one(sb.from("ranked_stats").upsert(row)),
+    getBest: (uid) => one(sb.from("best_lineups").select("total").eq("user_id", uid).maybeSingle()),
+    async getBestFull(uid) { const r = await one(sb.from("best_lineups").select("total,pct,mode,lineup,finished_at").eq("user_id", uid).maybeSingle()); return r && num(r, "total", "pct"); },
+    putBest: (row) => one(sb.from("best_lineups").upsert({ ...row, finished_at: new Date().toISOString() })),
+    // every finished Daily for a date (for stats). Capped; aggregate in SQL if the game gets huge.
+    async dailyAll(date) { return (await one(sb.from("daily_results").select("user_id,total,pct,picks").eq("play_date", date).limit(20000))).map((r) => num(r, "total", "pct")); },
+    async dailyCounts(dates) {
+      if (!dates.length) return {};
+      const rows = await one(sb.from("daily_results").select("play_date").in("play_date", dates).limit(100000));
+      return rows.reduce((m, r) => ((m[r.play_date] = (m[r.play_date] || 0) + 1), m), {});
+    },
+    async archiveGames(uid) { return one(sb.from("games").select("id,play_date,status,state").eq("user_id", uid).eq("mode", "archive").limit(400)); },
+    async uploadCard(id, bytes) {
+      const { error } = await sb.storage.from("cards").upload(`${id}.png`, bytes, { contentType: "image/png", upsert: true });
+      if (error) throw error;
+      return sb.storage.from("cards").getPublicUrl(`${id}.png`).data.publicUrl;
+    },
+    savePush: (row) => one(sb.from("push_subscriptions").upsert(row)),
+    deletePush: (endpoint) => one(sb.from("push_subscriptions").delete().eq("endpoint", endpoint)),
+    getStats: (uid) => one(sb.from("user_stats").select("*").eq("user_id", uid).maybeSingle()),
+    putStats: (row) => one(sb.from("user_stats").upsert(row)),
+
+    async dailyTop(date, n, ids) {
+      let q = sb.from("daily_results").select("username,total,pct,grid,finished_at", { count: "exact" }).eq("play_date", date);
+      if (ids) q = q.in("user_id", ids);
+      const { data, count, error } = await q.order("total", { ascending: false }).order("pct", { ascending: false }).order("finished_at").limit(n);
+      if (error) throw error;
+      return { rows: data.map((r) => num(r, "total", "pct")), count };
+    },
+    async rankedTop(n, ids) {
+      let q = sb.from("ranked_stats").select("username,games,rating,best,sr,peak").gte("games", 5);
+      if (ids) q = q.in("user_id", ids);
+      return (await one(q.order("sr", { ascending: false }).order("games", { ascending: false }).limit(n))).map((r) => num(r, "rating", "best", "sr", "peak"));
+    },
+    async bestTop(n, ids) {
+      let q = sb.from("best_lineups").select("username,total,pct,mode,lineup");
+      if (ids) q = q.in("user_id", ids);
+      return (await one(q.order("total", { ascending: false }).order("finished_at").limit(n))).map((r) => num(r, "total", "pct"));
+    },
+
+    async createGroup({ name, code, owner }) {
+      const { data, error } = await sb.from("groups").insert({ name, code, owner }).select("id,code,name").single();
+      if (error?.code === "23505") return null; // code collision: caller retries
+      if (error) throw error;
+      return data;
+    },
+    findGroupByCode: (code) => one(sb.from("groups").select("id,code,name").eq("code", code).maybeSingle()),
+    joinGroup: (groupId, uid) => one(sb.from("group_members").upsert({ group_id: groupId, user_id: uid })),
+    leaveGroup: (groupId, uid) => one(sb.from("group_members").delete().eq("group_id", groupId).eq("user_id", uid)),
+    async groupMemberIds(groupId) { return (await one(sb.from("group_members").select("user_id").eq("group_id", groupId))).map((r) => r.user_id); },
+    async myGroups(uid) {
+      const rows = await one(sb.from("group_members").select("groups(id,code,name,group_members(count))").eq("user_id", uid));
+      return rows.map((r) => ({ id: r.groups.id, code: r.groups.code, name: r.groups.name, members: r.groups.group_members?.[0]?.count ?? 1 }));
+    },
+  };
+}

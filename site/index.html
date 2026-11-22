@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Start 'Em — who are you starting?</title>
+<meta name="description" content="Roll random NFL teams from 1999–2025, start one player from each, and see what he really scored in full PPR. Daily, Ranked and Casual modes.">
+<!-- link previews (iMessage, Discord, X, Slack...). %SITE_URL% is filled in by the deploy workflow. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Start 'Em">
+<meta property="og:title" content="Start 'Em — who are you starting?">
+<meta property="og:description" content="7 random NFL teams. 7 picks. See what they really scored in full PPR. Play today's Daily.">
+<meta property="og:url" content="%SITE_URL%">
+<meta property="og:image" content="%SITE_URL%og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Start 'Em: who are you starting?">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Start 'Em — who are you starting?">
+<meta name="twitter:description" content="7 random NFL teams. 7 picks. Full PPR since 1999.">
+<meta name="twitter:image" content="%SITE_URL%og-image.png">
+<!-- installable app -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0D1A2B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Start 'Em">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800;900&family=Inter+Tight:wght@400;500;600;700;800&family=Doto:wght@700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="alternate icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230F1C2E'/><circle cx='10' cy='16' r='3' fill='%23FFB627'/><circle cx='22' cy='16' r='3' fill='%23FFB627'/><circle cx='16' cy='9' r='3' fill='%23FFB627'/><circle cx='16' cy='23' r='3' fill='%23FFB627'/></svg>">
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="teams.js"></script>
+<script src="share.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
