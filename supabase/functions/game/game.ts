@@ -181,11 +181,18 @@ export const EMOJI = { best: "🟩", close: "🟨", miss: "🟥" };
 // Season record from raw PPR, like 82-0: the team's real strength. 14-0 takes 2,100+ (perfect picks on great rolls).
 // Calibrated by simulation: random picks ~700, a stat-follower ~1,450, an expert ~1,700, perfect picks ~1,800.
 export const RECORD = { floor: 900, perfect: 2100 };
-export function winsFor(total) {
-  if (total >= RECORD.perfect) return 14;
+export function winsFor(total, allGreen = false) {
+  // 14-0 takes the points AND a perfect card: every pick the best on its roll. Big points with a miss top out at 13-1.
+  if (total >= RECORD.perfect) return allGreen ? 14 : 13;
   return Math.max(0, Math.min(13, Math.floor((14 * (total - RECORD.floor)) / (RECORD.perfect - RECORD.floor))));
 }
-export function record(total) { const w = winsFor(total); return { wins: w, losses: 14 - w }; }
+export function record(total, allGreen = false) { const w = winsFor(total, allGreen); return { wins: w, losses: 14 - w }; }
+// all seven picks green, from the stored emoji grid, the lineup's grades, or (older rows) 100% accuracy
+export function isAllGreen({ grid, lineup, pct } = {}) {
+  if (grid) { const sq = [...grid]; return sq.length === 7 && sq.every((c) => c === EMOJI.best); }
+  if (lineup?.length && lineup.every((l) => l.grade)) return lineup.every((l) => l.grade === "best");
+  return Number(pct) >= 99.95;
+}
 
 // ---------- Ranked ladder ----------
 // SR moves by how your pick accuracy compares with what's expected at your level.

@@ -32,7 +32,7 @@ export function makeStore(sb) {
     async getBestFull(uid) { const r = await one(sb.from("best_lineups").select("total,pct,mode,lineup,finished_at").eq("user_id", uid).maybeSingle()); return r && num(r, "total", "pct"); },
     putBest: (row) => one(sb.from("best_lineups").upsert({ ...row, finished_at: new Date().toISOString() })),
     // every finished Daily for a date (for stats). Capped; aggregate in SQL if the game gets huge.
-    async dailyAll(date) { return (await one(sb.from("daily_results").select("user_id,total,pct,picks").eq("play_date", date).limit(20000))).map((r) => num(r, "total", "pct")); },
+    async dailyAll(date) { return (await one(sb.from("daily_results").select("user_id,total,pct,grid,picks").eq("play_date", date).limit(20000))).map((r) => num(r, "total", "pct")); },
     async dailyCounts(dates) {
       if (!dates.length) return {};
       const rows = await one(sb.from("daily_results").select("play_date").in("play_date", dates).limit(100000));

@@ -170,7 +170,7 @@
     localStorage.setItem("se_seen_how", "1");
     sheet(`
       <h2 class="sheet-h">How to play</h2>
-      <p class="sheet-lede">Build the highest-scoring full-PPR lineup in NFL history, one random team at a time. Get close enough to perfect and your team goes 14-0.</p>
+      <p class="sheet-lede">Build the highest-scoring full-PPR lineup in NFL history, one random team at a time. Score big with seven perfect picks and your team goes 14-0.</p>
       <ol class="steps">
         <li><b>Roll a team.</b> Each round hands you a random team from a random season, 1999 to 2025. Think 2007 Patriots or 2016 Falcons.</li>
         <li><b>Start one guy.</b> You see the roster's names and positions. No stats. Your football brain is the only cheat sheet.</li>
@@ -179,7 +179,7 @@
         <li><b>Watch the reveal.</b> His PPR total and points per game flip over. <span class="g best">Green</span> means he was the best pick on that roll for that spot, <span class="g close">yellow</span> means close, <span class="g miss">red</span> means you left points on the table.</li>
       </ol>
       <h3 class="sheet-sub">How you're scored</h3>
-      <p>Your <b>season record</b> comes from how many PPR points your lineup scores. Going 14-0 takes elite picks <i>and</i> some luck with the teams you roll, so a perfect season is rare. How many points it takes is for you to figure out. You also get <b>pick accuracy</b>: your total as a % of the best lineup your teams allowed, which shows how well you played the hand you were dealt. Ranked ratings use pick accuracy, so bad rolls don't sink you there.</p>
+      <p>Your <b>season record</b> comes from how many PPR points your lineup scores. Going 14-0 takes a huge total <i>and</i> all seven picks green (the best start on every roll), so a perfect season is rare. How many points it takes is for you to figure out. You also get <b>pick accuracy</b>: your total as a % of the best lineup your teams allowed, which shows how well you played the hand you were dealt. Ranked ratings use pick accuracy, so bad rolls don't sink you there.</p>
       <p>One more rule: you can't start the same player twice, even if he shows up on two different rolls.</p>
       <h3 class="sheet-sub">Modes</h3>
       <dl class="modes-dl">

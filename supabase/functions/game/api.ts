@@ -2,13 +2,13 @@
 // Game API. Storage + auth are injected so the same code runs on Supabase and in tests.
 import {
   SLOTS, MODES, slotAccepts, rollQueue, todayET, dailyNumber, getRoll, visible, LAUNCH, themeFor, dailyQueue, publicTheme, streaks, weekStart,
-  publicRoll, reveal, gradePick, optimalLineup, EMOJI, record, rerollKey, tierFor, srChange, PLACEMENT_GAMES,
+  publicRoll, reveal, gradePick, optimalLineup, EMOJI, record, isAllGreen, rerollKey, tierFor, srChange, PLACEMENT_GAMES,
 } from "./game.ts";
 
 const withTier = (r) => r && { ...r, sr: Number(r.sr ?? 1000), tier: tierFor(Number(r.sr ?? 1000)), peakTier: tierFor(Number(r.peak ?? r.sr ?? 1000)), placing: r.games < PLACEMENT_GAMES, placementTotal: PLACEMENT_GAMES };
 
 // the record formula stays on the server so the 14-0 cutoff can't be read from the site's code
-const recStr = (total) => { const r = record(Number(total)); return `${r.wins}-${r.losses}`; };
+const recStr = (total, row = {}) => { const r = record(Number(total), isAllGreen(row)); return `${r.wins}-${r.losses}`; };
 
 class HttpError extends Error { constructor(status, msg) { super(msg); this.status = status; } }
 const fail = (status, msg) => { throw new HttpError(status, msg); };
@@ -55,7 +55,7 @@ async function finish(db, g, profile) {
   const bestPick = [...s.picks].sort((a, b) => b.player.pts - a.player.pts)[0];
   const worst = s.picks.map((p) => ({ p, d: p.player.pts - p.best.pts })).sort((a, b) => a.d - b.d)[0];
   s.result = {
-    total, optimal: opt.total, pct, record: record(total), optimalLineup: opt.lineup,
+    total, optimal: opt.total, pct, record: record(total, s.picks.every((p) => p.grade === "best")), optimalLineup: opt.lineup,
     grid: s.picks.map((p) => EMOJI[p.grade]).join(""),
     bestPick: { name: bestPick.player.name, pts: bestPick.player.pts, season: bestPick.season, team: bestPick.team },
     biggestMiss: worst.d < 0 ? { name: worst.p.player.name, pts: worst.p.player.pts, instead: worst.p.best.name, insteadPts: worst.p.best.pts, lost: r1(-worst.d), season: worst.p.season, team: worst.p.team } : null,
@@ -100,7 +100,7 @@ async function finish(db, g, profile) {
   if (!best || total > Number(best.total)) {
     await db.putBest({
       user_id: g.user_id, username, total, pct, mode: g.mode,
-      lineup: s.picks.map((p) => ({ slot: p.slot, name: p.player.name, season: p.season, team: p.team, pts: p.player.pts })),
+      lineup: s.picks.map((p) => ({ slot: p.slot, name: p.player.name, season: p.season, team: p.team, pts: p.player.pts, grade: p.grade })),
     });
   }
 }
@@ -142,11 +142,11 @@ const actions = {
       db.friendsToday(auth.id, today),
     ]);
     // played first (highest score first), then who hasn't played yet
-    const fr = friends.map((f) => ({ ...f, record: f.total == null ? null : recStr(f.total) }))
+    const fr = friends.map((f) => ({ ...f, record: f.total == null ? null : recStr(f.total, f) }))
       .sort((a, b) => (b.total ?? -1) - (a.total ?? -1) || a.username.localeCompare(b.username));
     return {
       signedIn: true, email: auth.email, username: profile.username, today, dailyNumber: dailyNumber(today), theme,
-      dailyDone: dailyDone && { ...dailyDone, total: Number(dailyDone.total), record: recStr(Number(dailyDone.total)) },
+      dailyDone: dailyDone && { ...dailyDone, total: Number(dailyDone.total), record: recStr(Number(dailyDone.total), dailyDone) },
       dailyActive: !!dailyGame, ranked: withTier(ranked), rankedActive: !!rankedGame,
       streak: streaks(dates, today), groups,
       friends: { played: fr.filter((f) => f.total != null).length, total: fr.length, list: fr.slice(0, 12) },
@@ -194,7 +194,7 @@ const actions = {
     const mine = {};
     if (auth) {
       for (const g of await db.archiveGames(auth.id)) mine[g.play_date] = g.status === "done" ? { total: g.state.result.total, record: g.state.result.record, played: "archive" } : { active: true };
-      for (const d of dates) { const r = await db.getDaily(d, auth.id); if (r) mine[d] = { total: Number(r.total), record: record(Number(r.total)), played: "daily" }; }
+      for (const d of dates) { const r = await db.getDaily(d, auth.id); if (r) mine[d] = { total: Number(r.total), record: record(Number(r.total), isAllGreen(r)), played: "daily" }; }
     }
     return { days: dates.map((d) => ({ date: d, number: dailyNumber(d), players: counts[d] || 0, mine: mine[d] || null, theme: publicTheme(themeFor(d)) })) };
   },
@@ -268,7 +268,7 @@ const actions = {
     if (board === "daily") {
       const date = body.date || todayET();
       const { rows, count } = await db.dailyTop(date, 10, ids);
-      return { board, date, number: dailyNumber(date), players: count, rows: rows.map((x) => ({ ...x, record: recStr(x.total) })) };
+      return { board, date, number: dailyNumber(date), players: count, rows: rows.map((x) => ({ ...x, record: recStr(x.total, x) })) };
     }
     if (board === "week") {
       const today = todayET(), from = weekStart(today);
@@ -277,7 +277,7 @@ const actions = {
       return { board, from, to: today, players: all.length, rows: all.slice(0, 10) };
     }
     if (board === "ranked") return { board, rows: (await db.rankedTop(10, ids)).map((x) => ({ ...x, tier: tierFor(Number(x.sr ?? 1000)) })) };
-    if (board === "alltime") return { board, rows: (await db.bestTop(10, ids)).map((x) => ({ ...x, record: recStr(x.total) })) };
+    if (board === "alltime") return { board, rows: (await db.bestTop(10, ids)).map((x) => ({ ...x, record: recStr(x.total, x) })) };
     fail(400, "Unknown leaderboard.");
   },
 
@@ -317,9 +317,9 @@ const actions = {
     return {
       username: profile.username, joined: profile.created_at || null,
       streak: streaks(dates, today),
-      daily: (await db.dailyHistory(auth.id, 21)).map((x) => ({ ...x, record: recStr(x.total) })),
+      daily: (await db.dailyHistory(auth.id, 21)).map((x) => ({ ...x, record: recStr(x.total, x) })),
       ranked: withTier(await db.getRanked(auth.id)),
-      best: await (async () => { const b = await db.getBestFull(auth.id); return b && { ...b, record: recStr(b.total) }; })(),
+      best: await (async () => { const b = await db.getBestFull(auth.id); return b && { ...b, record: recStr(b.total, b) }; })(),
       stats: await db.getStats(auth.id),
       groups: await db.myGroups(auth.id),
     };
@@ -354,7 +354,7 @@ async function dailyStatsFor({ auth, db, body }) {
   if (!mine && body.game) {
     const g = await db.getGame(String(body.game));
     if (g && g.status === "done" && (g.mode === "archive" || g.mode === "daily") && g.play_date === date && (!g.user_id || g.user_id === auth?.id)) {
-      mine = { total: g.state.result.total, picks: g.state.picks.map((p, i) => ({ i, id: p.player.id, rollKey: p.rollKey })), source: g.mode };
+      mine = { total: g.state.result.total, grid: g.state.result.grid, picks: g.state.picks.map((p, i) => ({ i, id: p.player.id, rollKey: p.rollKey })), source: g.mode };
     }
   }
   if (!mine) fail(403, "Finish this Daily to see how everyone played it.");
@@ -363,8 +363,8 @@ async function dailyStatsFor({ auth, db, body }) {
   const n = others.length;
   const beat = n ? Math.round((others.filter((r) => r.total < mine.total).length / n) * 100) : null;
   const wins = Array(15).fill(0);
-  for (const r of rows) wins[record(r.total).wins]++;
-  if (mine.source === "archive") wins[record(mine.total).wins]++;
+  for (const r of rows) wins[record(r.total, isAllGreen(r)).wins]++;
+  if (mine.source === "archive") wins[record(mine.total, isAllGreen(mine)).wins]++;
   const queue = dailyQueue(date);
   const rolls = queue.slice(0, 7).map((key, i) => {
     const counts = new Map();
