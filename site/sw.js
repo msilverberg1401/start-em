@@ -1,5 +1,5 @@
 // Start 'Em service worker: makes the site installable, caches the app shell, shows daily reminders.
-const CACHE = "start-em-v1";
+const CACHE = "start-em-v2";
 const SHELL = ["./", "index.html", "style.css", "app.js", "share.js", "teams.js", "config.js", "icon-192.png", "icon-512.png", "manifest.webmanifest"];
 
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
@@ -10,7 +10,8 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
-  e.respondWith(fetch(e.request).then((res) => {
+  // no-cache: always check with the server (cheap 304 if unchanged) so new versions show up right away
+  e.respondWith(fetch(e.request, { cache: "no-cache" }).then((res) => {
     const copy = res.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); return res;
   }).catch(() => caches.match(e.request).then((r) => r || caches.match("index.html"))));
 });

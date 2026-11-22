@@ -32,6 +32,11 @@ jobs:
           URL="${{ vars.SITE_URL }}"
           [ -n "$URL" ] && case "$URL" in */) ;; *) URL="$URL/";; esac
           sed -i "s#%SITE_URL%#${URL}#g" site/index.html
+      - name: Version the CSS and JS so browsers fetch new copies after each deploy
+        run: |
+          V="${GITHUB_SHA::8}"
+          sed -i -E "s#(href|src)=\"(style\.css|config\.js|teams\.js|share\.js|app\.js)\"#\1=\"\2?v=$V\"#g" site/index.html
+          grep -o '?v=[0-9a-f]*' site/index.html | head -1
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with: { path: site }
