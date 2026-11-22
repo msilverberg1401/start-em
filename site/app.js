@@ -76,7 +76,38 @@
     $("[data-how]")?.addEventListener("click", howToPlay);
     $("[data-install]")?.addEventListener("click", installApp);
     $("[data-login]")?.addEventListener("click", () => loginSheet());
-    $("[data-account]")?.addEventListener("click", () => (me.username ? profileView() : usernameSheet()));
+    $("[data-account]")?.addEventListener("click", (e) => (me.username ? accountMenu(e.currentTarget) : usernameSheet()));
+  }
+
+  // dropdown under the username in the top bar
+  function accountMenu(btn) {
+    const open = document.querySelector(".acct-menu");
+    if (open) return open.remove();
+    const m = document.createElement("div");
+    m.className = "acct-menu"; m.setAttribute("role", "menu");
+    m.innerHTML = `
+      <div class="am-head">Signed in as<b>${esc(me.username)}</b></div>
+      <button role="menuitem" data-am="profile">Profile &amp; stats</button>
+      <button role="menuitem" data-am="invite">Invite friends</button>
+      <button role="menuitem" data-am="out" class="am-out">Log out</button>`;
+    const r = btn.getBoundingClientRect();
+    m.style.top = `${r.bottom + 8}px`;
+    m.style.right = `${Math.max(8, window.innerWidth - r.right)}px`;
+    document.body.appendChild(m);
+    const close = () => { m.remove(); document.removeEventListener("click", outside, true); document.removeEventListener("keydown", esc_); };
+    const outside = (e) => { if (!m.contains(e.target) && e.target !== btn) close(); };
+    const esc_ = (e) => { if (e.key === "Escape") close(); };
+    setTimeout(() => { document.addEventListener("click", outside, true); document.addEventListener("keydown", esc_); });
+    m.querySelector('[data-am="profile"]').addEventListener("click", () => { close(); profileView(); });
+    m.querySelector('[data-am="invite"]').addEventListener("click", () => { close(); inviteFriends(); });
+    m.querySelector('[data-am="out"]').addEventListener("click", async () => { close(); await sb.auth.signOut(); });
+  }
+
+  async function inviteFriends() {
+    const link = (CFG.shareBase || SITE_URL).replace(/\/$/, "") + "/";
+    const msg = `Start 'Em 🏈 Seven random NFL teams, start one player from each, see what he really scored. Think you know ball? ${link}`;
+    try { if (navigator.share) return await navigator.share({ text: msg, title: "Start 'Em" }); } catch (e) { if (e.name === "AbortError") return; }
+    try { await navigator.clipboard.writeText(msg); toast("Invite copied. Paste it in the group chat."); } catch { toast(link); }
   }
 
   // ---------- sheets (modal dialogs) ----------

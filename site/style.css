@@ -768,3 +768,13 @@ h1, h2, h3, h4 { margin: 0; }
 .remind span { color: var(--ink-2); font-size: 15px; }
 .remind .btn { flex: none; }
 @media (max-width: 640px) { .remind { flex-direction: column; align-items: stretch; } .navbtn.app ~ .navbtn[data-how], .navbtn.exit ~ .navbtn[data-how] { display: none; } }
+
+/* account dropdown */
+.acct-menu { position: fixed; z-index: 60; min-width: 210px; background: #fff; color: var(--ink); border-radius: 8px; box-shadow: 0 12px 32px rgba(11,18,32,.28), 0 0 0 1px rgba(11,18,32,.08); padding: 6px; display: grid; animation: am-in .14s ease-out; }
+.acct-menu .am-head { padding: 8px 12px 10px; font-size: 12.5px; color: var(--ink-3); border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.acct-menu .am-head b { display: block; font-size: 15px; color: var(--ink); margin-top: 2px; }
+.acct-menu button { text-align: left; padding: 10px 12px; border-radius: 5px; font-weight: 600; font-size: 14.5px; color: var(--ink); background: none; }
+.acct-menu button:hover, .acct-menu button:focus-visible { background: #F1F4F8; }
+.acct-menu .am-out { color: #C62828; }
+@keyframes am-in { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .acct-menu { animation: none; } }
