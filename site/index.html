@@ -30,6 +30,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://rcwmvwtlorrqlsmviuny.supabase.co" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800;900&family=Inter+Tight:wght@400;500;600;700;800&family=Doto:wght@700;900&display=swap" rel="stylesheet">
+<script>
+  // pick light/dark before the page draws: the player's choice, else the device setting
+  (function () { var t; try { t = localStorage.getItem("se_theme"); } catch (e) {}
+    var dark = t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.dataset.theme = dark ? "dark" : "light"; })();
+</script>
 <link rel="stylesheet" href="style.css">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="alternate icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230F1C2E'/><circle cx='10' cy='16' r='3' fill='%23FFB627'/><circle cx='22' cy='16' r='3' fill='%23FFB627'/><circle cx='16' cy='9' r='3' fill='%23FFB627'/><circle cx='16' cy='23' r='3' fill='%23FFB627'/></svg>">
@@ -37,7 +43,7 @@
 <body>
 <div id="app"></div>
 <div id="toast" role="status" aria-live="polite"></div>
-<p style="text-align:center;margin:28px 0 20px;font:13px Inter Tight,system-ui,sans-serif;opacity:.6"><a href="privacy.html" style="color:inherit">Privacy</a></p>
+<p class="site-foot"><button class="theme-btn" id="themebtn" type="button"></button><a href="privacy.html">Privacy</a></p>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="teams.js"></script>

@@ -36,6 +36,19 @@ export function memStore() {
     async leaveGroup(gid, u) { T.members = T.members.filter((m) => !(m.g === gid && m.u === u)); },
     async groupMemberIds(gid) { return T.members.filter((m) => m.g === gid).map((m) => m.u); },
     async myGroups(u) { return T.members.filter((m) => m.u === u).map((m) => { const g = T.groups.get(m.g); return { id: g.id, code: g.code, name: g.name, members: T.members.filter((x) => x.g === g.id).length }; }); },
+    async friendsToday(u, d) {
+      const mine = T.members.filter((m) => m.u === u).map((m) => m.g);
+      const ids = [...new Set(T.members.filter((m) => mine.includes(m.g)).map((m) => m.u))].filter((x) => x !== u);
+      return ids.filter((id) => T.profiles.has(id)).map((id) => { const r = T.daily.get(`${d}/${id}`); return { username: T.profiles.get(id).username, total: r ? r.total : null, grid: r?.grid || null }; });
+    },
+    async weekTotals(from, to, ids) {
+      const m = new Map();
+      for (const r of T.daily.values()) {
+        if (r.play_date < from || r.play_date > to || (ids && !ids.includes(r.user_id))) continue;
+        const x = m.get(r.user_id) || { username: r.username, total: 0, days: 0 }; x.total += r.total; x.days++; m.set(r.user_id, x);
+      }
+      return [...m.values()];
+    },
     async cleanupCasual() {},
     async dailyAll(d) { return [...T.daily.values()].filter((r) => r.play_date === d).map(clone); },
     async dailyCounts(dates) { const m = {}; for (const r of T.daily.values()) if (dates.includes(r.play_date)) m[r.play_date] = (m[r.play_date] || 0) + 1; return m; },

@@ -223,3 +223,30 @@ export function srChange(sr, pct, gamesBefore) {
   if (placing && sr + d > PLACEMENT_CEILING) d = Math.max(0, PLACEMENT_CEILING - sr);
   return d;
 }
+
+// ---------- weeks + streaks ----------
+const dayAdd = (d, n) => new Date(Date.parse(d) + n * 864e5).toISOString().slice(0, 10);
+// Weeks run Tuesday to Monday, like the NFL week (new week the day after Monday Night Football).
+export function weekStart(date) {
+  const dow = new Date(date + "T12:00:00Z").getUTCDay(); // 0 Sun .. 6 Sat
+  return dayAdd(date, -((dow + 5) % 7)); // back to the most recent Tuesday
+}
+// Daily streak with one automatic streak freeze per week: a single missed day is covered if that
+// week's freeze is still unused. Covered days keep the streak alive but don't add to it.
+export function streaks(dates, today) {
+  const set = new Set(dates);
+  if (!set.size) return { current: 0, best: 0, playedToday: false, freezeLeft: true, savedOn: null };
+  let d = [...set].sort()[0], run = 0, best = 0, savedOn = null, thisRun = [];
+  const used = new Set();
+  for (; d <= today; d = dayAdd(d, 1)) {
+    if (set.has(d)) { run++; best = Math.max(best, run); continue; }
+    if (d === today) break; // today isn't over yet
+    const wk = weekStart(d);
+    if (run > 0 && !used.has(wk)) { used.add(wk); thisRun.push(wk); savedOn = d; continue; }
+    // streak ends; freezes spent on it didn't save anything, so give them back
+    for (const w of thisRun) used.delete(w);
+    run = 0; savedOn = null; thisRun = [];
+  }
+  return { current: run, best, playedToday: set.has(today), freezeLeft: !used.has(weekStart(today)), savedOn: run ? savedOn : null };
+}
+

@@ -28,6 +28,19 @@
     if (!res.ok) throw Object.assign(new Error(data.error || "Request failed."), { status: res.status });
     return data;
   }
+  // ---------- light / dark ----------
+  const isDark = () => document.documentElement.dataset.theme === "dark";
+  function applyTheme(dark) {
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#0B1626" : "#0D1A2B");
+    const b = document.getElementById("themebtn"); if (b) b.textContent = dark ? "☀️ Light mode" : "🌙 Dark mode";
+  }
+  function toggleTheme() { const dark = !isDark(); try { localStorage.setItem("se_theme", dark ? "dark" : "light"); } catch {} applyTheme(dark); }
+  applyTheme(isDark());
+  document.getElementById("themebtn")?.addEventListener("click", toggleTheme);
+  // follow the device setting live, unless the player picked one
+  matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", (e) => { let t = null; try { t = localStorage.getItem("se_theme"); } catch {} if (!t) applyTheme(e.matches); });
+
   function toast(msg) {
     const t = $("#toast"); t.textContent = msg; t.classList.add("show");
     clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 3000);
@@ -56,6 +69,9 @@
     const m = Math.floor((next - et) / 60000);
     return `${Math.floor(m / 60)}h ${m % 60}m`;
   }
+  const shortDate = (d) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+  const weekEnd = (from) => new Date(Date.parse(from) + 6 * 864e5).toISOString().slice(0, 10);
+
   const topbar = (right = "") => `
     <header class="appbar"><div class="wrap">
       <a class="wordmark" href="#" data-home>START<span>'EM</span></a>
@@ -89,6 +105,7 @@
       <div class="am-head">Signed in as<b>${esc(me.username)}</b></div>
       <button role="menuitem" data-am="profile">Profile &amp; stats</button>
       <button role="menuitem" data-am="invite">Invite friends</button>
+      <button role="menuitem" data-am="theme">${isDark() ? "☀️ Light mode" : "🌙 Dark mode"}</button>
       <button role="menuitem" data-am="out" class="am-out">Log out</button>`;
     const r = btn.getBoundingClientRect();
     m.style.top = `${r.bottom + 8}px`;
@@ -100,6 +117,7 @@
     setTimeout(() => { document.addEventListener("click", outside, true); document.addEventListener("keydown", esc_); });
     m.querySelector('[data-am="profile"]').addEventListener("click", () => { close(); profileView(); });
     m.querySelector('[data-am="invite"]').addEventListener("click", () => { close(); inviteFriends(); });
+    m.querySelector('[data-am="theme"]').addEventListener("click", () => { close(); toggleTheme(); });
     m.querySelector('[data-am="out"]').addEventListener("click", async () => { close(); await sb.auth.signOut(); });
   }
 
@@ -245,6 +263,27 @@
     $("[data-out]", s.el).addEventListener("click", async () => { await sb.auth.signOut(); s.close(); });
   }
 
+  // streak + friends under the Play button
+  function pulse() {
+    const st = me.streak || {}, f = me.friends || { list: [], played: 0, total: 0 };
+    const fire = st.current
+      ? `<span class="pl-streak"><b>🔥 ${st.current}</b>-day streak</span>`
+      : `<span class="pl-streak">Play today to start a streak 🔥</span>`;
+    const freeze = st.savedOn
+      ? `<span class="pl-freeze" title="One missed day a week is covered">🧊 Streak freeze saved you on ${new Date(st.savedOn + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" })}</span>`
+      : st.current && st.freezeLeft ? `<span class="pl-freeze" title="If you miss one day this week, your streak is safe">🧊 Streak freeze ready</span>` : "";
+    const friends = f.total
+      ? `<div class="pl-friends">
+          <div class="pl-fh">Friends today <span>${f.played} of ${f.total} played</span></div>
+          <div class="pl-row">${f.list.map((x) => x.total == null
+            ? `<span class="pl-f idle"><b>${esc(x.username)}</b><i>Not yet</i></span>`
+            : `<span class="pl-f"><b>${esc(x.username)}</b><i>${x.total.toFixed(1)} · ${x.record}</i></span>`).join("")}
+            ${me.dailyDone ? "" : `<span class="pl-f you"><b>You</b><i>Not yet</i></span>`}</div>
+        </div>`
+      : `<button class="pl-invite" data-groups>👥 Play with your league: make a group and see each other's scores here</button>`;
+    return `<div class="pulse"><div class="pl-top">${fire}${freeze}</div>${friends}</div>`;
+  }
+
   // ================= HOME =================
   async function home() {
     game = null; selected = null;
@@ -262,6 +301,7 @@
             <button class="btn yel big" data-mode="daily" ${dailyDone ? "disabled" : ""}>${dailyDone ? `Daily done: ${dailyDone.pct}%` : me.dailyActive ? `Resume Daily #${me.dailyNumber}` : `Play Daily #${me.dailyNumber ?? ""}`}</button>
             <button class="btn navy big" data-how2>How to play</button>
           </div>
+          ${me.signedIn && me.username ? pulse() : ""}
         </div>
       </section>
 
@@ -295,7 +335,7 @@
             <button class="chip add" data-groups>${me.groups?.length ? "Manage groups" : "+ Make or join a group"}</button>
           </div>
           <div class="tabs" role="tablist">
-            ${[["daily", "Today's Daily"], ["ranked", "Ranked ladder"], ["alltime", "Highest lineups ever"]]
+            ${[["daily", "Today's Daily"], ["week", "This week"], ["ranked", "Ranked ladder"], ["alltime", "Highest lineups ever"]]
               .map(([k, l]) => `<button role="tab" data-tab="${k}" aria-selected="${lbTab === k}">${l}</button>`).join("")}
           </div>
           <div id="lb"><div class="lb-empty">Loading the standings…</div></div>
@@ -310,7 +350,7 @@
     app.querySelectorAll("[data-scope]").forEach((b) => b.addEventListener("click", () => {
       lbGroup = b.dataset.scope || null; app.querySelectorAll("[data-scope]").forEach((x) => x.setAttribute("aria-pressed", x === b)); loadBoard();
     }));
-    $("[data-groups]")?.addEventListener("click", () => groupSheet());
+    app.querySelectorAll("[data-groups]").forEach((b) => b.addEventListener("click", () => groupSheet()));
     app.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => start(b.dataset.mode)));
     app.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => {
       lbTab = b.dataset.tab; app.querySelectorAll("[data-tab]").forEach((x) => x.setAttribute("aria-selected", x === b)); loadBoard();
@@ -325,19 +365,22 @@
       const d = await api("leaderboard", { board: lbTab, group: lbGroup });
       if (!d.rows.length) {
         const who = lbGroup ? "in this group" : "";
-        el.innerHTML = `<div class="lb-empty">${lbTab === "daily" ? `Nobody ${who} has finished today's Daily yet. Play it and take the top spot.` : lbTab === "ranked" ? `Nobody ${who} is on the ladder yet. Finish 5 Ranked placement games to show up here.` : `No lineups ${who} yet. Finish a Daily or Ranked game to set the record.`}</div>`;
+        el.innerHTML = `<div class="lb-empty">${lbTab === "daily" ? `Nobody ${who} has finished today's Daily yet. Play it and take the top spot.` : lbTab === "week" ? `Nobody ${who} has played a Daily this week yet. The week resets every Tuesday.` : lbTab === "ranked" ? `Nobody ${who} is on the ladder yet. Finish 5 Ranked placement games to show up here.` : `No lineups ${who} yet. Finish a Daily or Ranked game to set the record.`}</div>`;
         return;
       }
       const head = lbTab === "daily" ? "<th class='num'>Points</th><th>Season</th><th class='num hide-sm'>Accuracy</th><th class='hide-sm'>Picks</th>"
+        : lbTab === "week" ? "<th class='num'>Points</th><th class='num'>Days</th>"
         : lbTab === "ranked" ? "<th>Tier</th><th class='num'>SR</th><th class='num hide-sm'>Games</th>"
         : "<th class='num'>Points</th><th class='hide-sm'>Lineup</th>";
 
       el.innerHTML = `<table class="lb"><thead><tr><th>Rank</th><th>Player</th>${head}</tr></thead><tbody>${d.rows.map((r, i) => `
         <tr><td class="rk">${i + 1}</td><td class="nm">${esc(r.username)}</td>${
           lbTab === "daily" ? `<td class="num pts">${r.total.toFixed(1)}</td><td><span class="season-badge sm ${r.record === "14-0" ? "perfect" : ""}">${r.record}</span></td><td class="num hide-sm">${r.pct}%</td><td class="grid hide-sm">${esc(r.grid)}</td>`
+          : lbTab === "week" ? `<td class="num pts">${r.total.toFixed(1)}</td><td class="num">${r.days}/7</td>`
           : lbTab === "ranked" ? `<td>${tierBadge(r.tier, "sm")}</td><td class="num pts">${r.sr}</td><td class="num hide-sm">${r.games}</td>`
           : `<td class="num pts">${r.total.toFixed(1)} <span class="season-badge sm ${r.record === "14-0" ? "perfect" : ""}">${r.record}</span></td><td class="hide-sm lineup-cell">${r.lineup.map((l) => `${esc(l.name)} '${String(l.season).slice(2)}`).join(", ")}</td>`
         }</tr>`).join("")}</tbody></table>
+        ${lbTab === "week" ? `<p class="lb-note">Every Daily from ${shortDate(d.from)} to ${shortDate(weekEnd(d.from))} added up. Play every day to climb. Resets Tuesday.</p>` : ""}
         ${lbTab === "daily" ? `<p class="lb-note">${d.players} ${lbGroup ? "in this group " : ""}played Daily #${d.number}. Everyone had the same teams, so it's ranked by points.</p>` : ""}`;
     } catch (e) { el.innerHTML = `<div class="lb-empty">Couldn't load the standings. ${esc(e.message)}</div>`; }
   }
@@ -867,7 +910,7 @@
       <section class="panel">
         <div class="ph"><h2>${esc(p.username)}</h2><span class="aside">${p.streak.current ? `${p.streak.current}-day streak` : "Play today's Daily to start a streak"}</span></div>
         <div class="tiles">
-          ${tile("Daily streak", p.streak.current, p.streak.playedToday ? "Played today" : p.streak.current ? "Play today to keep it" : "")}
+          ${tile("Daily streak", p.streak.current, p.streak.playedToday ? (p.streak.freezeLeft ? "Played today · 🧊 freeze ready" : "Played today") : p.streak.current ? (p.streak.freezeLeft ? "🧊 Freeze ready if you miss today" : "Play today to keep it") : "")}
           ${tile("Best streak", p.streak.best)}
           ${tile("Ranked", p.ranked && !p.ranked.placing ? `${p.ranked.sr}` : "–", p.ranked ? (p.ranked.placing ? `Placement ${p.ranked.games}/${p.ranked.placementTotal}` : `${tierBadge(p.ranked.tier, "sm")} Peak ${esc(p.ranked.peakTier.label)}`) : "5 placement games")}
           ${tile("Best score", p.best ? Number(p.best.total).toFixed(1) : "–", p.best ? `${p.best.record} season` : "Daily or Ranked")}
@@ -993,7 +1036,7 @@
   // Ask once after a finished game (the moment people are most into it). If they say "Not now",
   // ask again at most once, 3+ days later. Never ask if blocked, already on, or another pop-up is open.
   function maybeAskReminders() {
-    if (!CFG.vapidPublicKey || pushOn() || document.querySelector(".sheet-wrap")) return;
+    if (!CFG.vapidPublicKey || pushOn() || document.querySelector(".sheet-wrap, .reveal-wrap") || !document.querySelector("#share")) return;
     if (typeof Notification !== "undefined" && Notification.permission === "denied") return;
     const iosNeedsInstall = isIOS() && !standalone();
     if (!iosNeedsInstall && (!("serviceWorker" in navigator) || !("PushManager" in window))) return;

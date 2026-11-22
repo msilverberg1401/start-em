@@ -1,7 +1,7 @@
 // @ts-nocheck
 // Game API. Storage + auth are injected so the same code runs on Supabase and in tests.
 import {
-  SLOTS, MODES, slotAccepts, rollQueue, todayET, dailyNumber, getRoll, visible, LAUNCH, themeFor, dailyQueue, publicTheme,
+  SLOTS, MODES, slotAccepts, rollQueue, todayET, dailyNumber, getRoll, visible, LAUNCH, themeFor, dailyQueue, publicTheme, streaks, weekStart,
   publicRoll, reveal, gradePick, optimalLineup, EMOJI, record, rerollKey, tierFor, srChange, PLACEMENT_GAMES,
 } from "./game.ts";
 
@@ -106,15 +106,6 @@ async function finish(db, g, profile) {
 }
 
 // consecutive Daily days. The current streak survives until midnight if today isn't played yet.
-export function streaks(dates, today) {
-  const set = new Set(dates);
-  const day = (d, n) => new Date(Date.parse(d) + n * 864e5).toISOString().slice(0, 10);
-  let cur = 0, d = set.has(today) ? today : day(today, -1);
-  while (set.has(d)) { cur++; d = day(d, -1); }
-  let best = 0, run = 0, prev = null;
-  for (const x of [...set].sort()) { run = prev && day(prev, 1) === x ? run + 1 : 1; best = Math.max(best, run); prev = x; }
-  return { current: cur, best, playedToday: set.has(today) };
-}
 
 async function needUser(auth, db) {
   if (!auth) fail(401, "Log in to play Daily and Ranked.");
@@ -141,18 +132,24 @@ const actions = {
     const profile = await db.getProfile(auth.id);
     if (!profile) return { signedIn: true, email: auth.email, username: null, today, dailyNumber: dailyNumber(today), theme };
     // independent lookups, so run them together instead of one after another
-    const [dailyDone, dailyGame, ranked, rankedGame, dates, groups] = await Promise.all([
+    const [dailyDone, dailyGame, ranked, rankedGame, dates, groups, friends] = await Promise.all([
       db.getDaily(today, auth.id),
       db.findGame({ user_id: auth.id, mode: "daily", play_date: today, status: "active" }),
       db.getRanked(auth.id),
       db.findGame({ user_id: auth.id, mode: "ranked", status: "active" }),
       db.dailyDates(auth.id),
       db.myGroups(auth.id),
+      db.friendsToday(auth.id, today),
     ]);
+    // played first (highest score first), then who hasn't played yet
+    const fr = friends.map((f) => ({ ...f, record: f.total == null ? null : recStr(f.total) }))
+      .sort((a, b) => (b.total ?? -1) - (a.total ?? -1) || a.username.localeCompare(b.username));
     return {
       signedIn: true, email: auth.email, username: profile.username, today, dailyNumber: dailyNumber(today), theme,
-      dailyDone, dailyActive: !!dailyGame, ranked: withTier(ranked), rankedActive: !!rankedGame,
+      dailyDone: dailyDone && { ...dailyDone, total: Number(dailyDone.total), record: recStr(Number(dailyDone.total)) },
+      dailyActive: !!dailyGame, ranked: withTier(ranked), rankedActive: !!rankedGame,
       streak: streaks(dates, today), groups,
+      friends: { played: fr.filter((f) => f.total != null).length, total: fr.length, list: fr.slice(0, 12) },
     };
   },
 
@@ -272,6 +269,12 @@ const actions = {
       const date = body.date || todayET();
       const { rows, count } = await db.dailyTop(date, 10, ids);
       return { board, date, number: dailyNumber(date), players: count, rows: rows.map((x) => ({ ...x, record: recStr(x.total) })) };
+    }
+    if (board === "week") {
+      const today = todayET(), from = weekStart(today);
+      const all = (await db.weekTotals(from, today, ids)).map((x) => ({ ...x, total: r1(x.total) }))
+        .sort((a, b) => b.total - a.total || b.days - a.days);
+      return { board, from, to: today, players: all.length, rows: all.slice(0, 10) };
     }
     if (board === "ranked") return { board, rows: (await db.rankedTop(10, ids)).map((x) => ({ ...x, tier: tierFor(Number(x.sr ?? 1000)) })) };
     if (board === "alltime") return { board, rows: (await db.bestTop(10, ids)).map((x) => ({ ...x, record: recStr(x.total) })) };

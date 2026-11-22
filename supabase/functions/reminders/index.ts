@@ -2,7 +2,7 @@
 // Daily reminder: sends a web push to everyone who opted in. Called once a day by pg_cron (see README).
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
-import { todayET, dailyNumber, themeFor } from "../game/game.ts";
+import { todayET, dailyNumber, themeFor, streaks as streakOf } from "../game/game.ts";
 
 const admin = createClient(Deno.env.get("SUPABASE_URL"), Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"), { auth: { persistSession: false } });
 webpush.setVapidDetails(Deno.env.get("VAPID_SUBJECT") || "mailto:hello@example.com", Deno.env.get("VAPID_PUBLIC_KEY"), Deno.env.get("VAPID_PRIVATE_KEY"));
@@ -22,11 +22,8 @@ Deno.serve(async (req) => {
     const { data } = await admin.from("daily_results").select("user_id,play_date").in("user_id", ids).gte("play_date", since);
     const byUser = {};
     for (const r of data || []) (byUser[r.user_id] ||= new Set()).add(r.play_date);
-    for (const [u, set] of Object.entries(byUser)) {
-      let c = 0, d = new Date(Date.parse(today) - 864e5).toISOString().slice(0, 10);
-      while (set.has(d)) { c++; d = new Date(Date.parse(d) - 864e5).toISOString().slice(0, 10); }
-      streaks[u] = c;
-    }
+    // same streak rules as the site, including the weekly streak freeze
+    for (const [u, set] of Object.entries(byUser)) streaks[u] = streakOf([...set], today).current;
   }
 
   let sent = 0, removed = 0;

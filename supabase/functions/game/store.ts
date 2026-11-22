@@ -77,6 +77,28 @@ export function makeStore(sb) {
     joinGroup: (groupId, uid) => one(sb.from("group_members").upsert({ group_id: groupId, user_id: uid })),
     leaveGroup: (groupId, uid) => one(sb.from("group_members").delete().eq("group_id", groupId).eq("user_id", uid)),
     async groupMemberIds(groupId) { return (await one(sb.from("group_members").select("user_id").eq("group_id", groupId))).map((r) => r.user_id); },
+    // everyone who shares a group with this player, with today's Daily result if they've played
+    async friendsToday(uid, date) {
+      const mine = (await one(sb.from("group_members").select("group_id").eq("user_id", uid))).map((r) => r.group_id);
+      if (!mine.length) return [];
+      const ids = [...new Set((await one(sb.from("group_members").select("user_id").in("group_id", mine).limit(2000))).map((r) => r.user_id))].filter((x) => x !== uid);
+      if (!ids.length) return [];
+      const [profiles, results] = await Promise.all([
+        one(sb.from("profiles").select("id,username").in("id", ids)),
+        one(sb.from("daily_results").select("user_id,total,grid").eq("play_date", date).in("user_id", ids)),
+      ]);
+      const res = new Map(results.map((r) => [r.user_id, r]));
+      return profiles.map((p) => { const r = res.get(p.id); return { username: p.username, total: r ? Number(r.total) : null, grid: r?.grid || null }; });
+    },
+    // Daily totals added up per player over a date range (weekly standings)
+    async weekTotals(from, to, ids) {
+      let q = sb.from("daily_results").select("user_id,username,total").gte("play_date", from).lte("play_date", to);
+      if (ids) q = q.in("user_id", ids);
+      const rows = await one(q.limit(100000));
+      const m = new Map();
+      for (const r of rows) { const x = m.get(r.user_id) || { username: r.username, total: 0, days: 0 }; x.total += Number(r.total); x.days++; x.username = r.username; m.set(r.user_id, x); }
+      return [...m.values()];
+    },
     async myGroups(uid) {
       const rows = await one(sb.from("group_members").select("groups(id,code,name,group_members(count))").eq("user_id", uid));
       return rows.map((r) => ({ id: r.groups.id, code: r.groups.code, name: r.groups.name, members: r.groups.group_members?.[0]?.count ?? 1 }));
