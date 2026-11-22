@@ -622,6 +622,7 @@
     $("#again")?.addEventListener("click", () => start(g.mode));
     $("#morepast")?.addEventListener("click", archiveView);
     wireReminder();
+    setTimeout(maybeAskReminders, 2500);
     if (g.mode === "daily" || g.mode === "archive") loadDailyStats(g);
     const shareLink = makeLink("c", g.id);
     const text = StartEmShare.text({ game: g, url: shareLink });
@@ -972,17 +973,43 @@
         try { const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); if (sub) { await api("deletePush", { endpoint: sub.endpoint }); await sub.unsubscribe(); } } catch {}
         localStorage.removeItem("se_push"); toast("Reminders are off."); return refreshView();
       }
-      if (!CFG.vapidPublicKey) return toast("Reminders turn on once the site is live.");
-      if (isIOS() && !standalone()) return installApp();
-      if (!("serviceWorker" in navigator) || !("PushManager" in window)) return toast("This browser can't do notifications. Try Chrome, or add Start 'Em to your home screen.");
-      try {
-        if ((await Notification.requestPermission()) !== "granted") return toast("Notifications are blocked. You can allow them in your browser settings.");
-        const reg = await navigator.serviceWorker.ready;
-        const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(CFG.vapidPublicKey) }));
-        await api("savePush", { sub: sub.toJSON() });
-        localStorage.setItem("se_push", "1"); toast("You're set. One ping a day when the Daily drops."); refreshView();
-      } catch (e) { toast("Couldn't turn on reminders. Try again."); }
+      await enableReminders();
     }));
+  }
+  async function enableReminders() {
+    if (!CFG.vapidPublicKey) { toast("Reminders turn on once the site is live."); return false; }
+    if (isIOS() && !standalone()) { installApp(); return false; }
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) { toast("This browser can't do notifications. Try Chrome, or add Start 'Em to your home screen."); return false; }
+    try {
+      if ((await Notification.requestPermission()) !== "granted") { toast("Notifications are blocked. You can allow them in your browser settings."); return false; }
+      const reg = await navigator.serviceWorker.ready;
+      const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(CFG.vapidPublicKey) }));
+      await api("savePush", { sub: sub.toJSON() });
+      localStorage.setItem("se_push", "1"); toast("You're set. One ping a day when the Daily drops."); refreshView();
+      return true;
+    } catch (e) { toast("Couldn't turn on reminders. Try again."); return false; }
+  }
+
+  // Ask once after a finished game (the moment people are most into it). If they say "Not now",
+  // ask again at most once, 3+ days later. Never ask if blocked, already on, or another pop-up is open.
+  function maybeAskReminders() {
+    if (!CFG.vapidPublicKey || pushOn() || document.querySelector(".sheet-wrap")) return;
+    if (typeof Notification !== "undefined" && Notification.permission === "denied") return;
+    const iosNeedsInstall = isIOS() && !standalone();
+    if (!iosNeedsInstall && (!("serviceWorker" in navigator) || !("PushManager" in window))) return;
+    let st = {}; try { st = JSON.parse(localStorage.getItem("se_push_ask") || "{}"); } catch {}
+    if ((st.n || 0) >= 2 || (st.t && Date.now() - st.t < 3 * 864e5)) return;
+    const s = sheet(`
+      <h2 class="sheet-h">Never miss a Daily</h2>
+      <p class="sheet-lede">${iosNeedsInstall
+        ? "Add Start 'Em to your home screen and we'll send one reminder a day when the new Daily drops. No spam."
+        : "Get one notification a day when the new Daily drops, plus a heads-up when your streak is on the line. No spam."}</p>
+      <button class="btn yel big" data-yes style="width:100%">${iosNeedsInstall ? "Add to home screen" : "Turn on reminders"}</button>
+      <button class="btn ghost" data-no style="width:100%;margin-top:10px">Not now</button>`);
+    const mark = () => { try { localStorage.setItem("se_push_ask", JSON.stringify({ n: (st.n || 0) + 1, t: Date.now() })); } catch {} };
+    mark();
+    $("[data-yes]", s.el).addEventListener("click", async () => { s.close(); await enableReminders(); });
+    $("[data-no]", s.el).addEventListener("click", () => s.close());
   }
   const refreshView = () => app.querySelectorAll("[data-remind]").forEach((b) => { const box = b.closest(".remind"); const tmp = document.createElement("div"); tmp.innerHTML = reminderBar(box.classList.contains("in")); box.replaceWith(tmp.firstElementChild); wireReminder(); });
 
