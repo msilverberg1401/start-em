@@ -714,22 +714,27 @@
       <div class="share-pop">
         <img src="${card.dataUrl}" alt="Your Start 'Em result card">
         <div class="share-opts">
-          ${navigator.share ? `<button class="btn yel big" data-native>${canFiles ? "Share card" : "Share"}</button><p class="hint">Opens your phone's share menu: Messages, Instagram, Snapchat and more.</p>` : ""}
+          ${navigator.share ? `<button class="btn yel big" data-native>Share</button><p class="hint">Sends your score and link. In chats the link shows your card.</p>` : ""}
           <div class="share-grid">
             <a class="share-app sms" href="sms:?&body=${enc}"><span>Messages</span></a>
             <a class="share-app wa" href="https://wa.me/?text=${enc}" target="_blank" rel="noopener"><span>WhatsApp</span></a>
             <a class="share-app x" href="https://twitter.com/intent/tweet?text=${enc}" target="_blank" rel="noopener"><span>X</span></a>
             <button class="share-app copy" data-copy><span>Copy text</span></button>
           </div>
+          ${canFiles ? `<button class="btn navy" data-img>Share image</button><p class="hint">For Instagram and Snapchat stories.</p>` : ""}
           <button class="btn ghost" data-save>Save image</button>
         </div>
       </div>`, { wide: true });
     $("[data-native]", s.el)?.addEventListener("click", async () => {
       try {
-        if (canFiles) await navigator.share({ files: [file], text, title: "Start 'Em" });
-        else await navigator.share({ text, title: "Start 'Em" });
+        // text + link only: the link preview already shows the card, so attaching it too would show it twice
+        await navigator.share({ text, title: "Start 'Em" });
         s.close();
       } catch (e) { if (e.name !== "AbortError") toast("Sharing isn't available here. Try Copy text."); }
+    });
+    $("[data-img]", s.el)?.addEventListener("click", async () => {
+      try { await navigator.share({ files: [file] }); s.close(); }
+      catch (e) { if (e.name !== "AbortError") toast("Couldn't share the image here. Try Save image."); }
     });
     $("[data-copy]", s.el).addEventListener("click", copyText);
     $("[data-save]", s.el).addEventListener("click", saveImg);
