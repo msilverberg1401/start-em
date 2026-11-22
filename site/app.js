@@ -70,6 +70,7 @@
     app.querySelectorAll("[data-home]").forEach((a) => a.addEventListener("click", (e) => {
       e.preventDefault();
       if (!confirmLeave) return home();
+      if (confirmLeave === "casual") return askConfirm("Quit this game?", "Casual games aren't saved, so your picks so far will be lost.", "Quit game").then((ok) => ok && home());
       askConfirm("Leave this game?", "Daily, Ranked and challenge games are saved, so you can pick them back up from the home page.", "Leave game").then((ok) => ok && home());
     }));
     $("[data-how]")?.addEventListener("click", howToPlay);
@@ -383,7 +384,7 @@
     const tally = g.picks.length ? [counts.best && `${counts.best} best`, counts.close && `${counts.close} close`, counts.miss && `${counts.miss} ${counts.miss === 1 ? "miss" : "misses"}`].filter(Boolean).join(", ") : "No picks yet";
 
     app.innerHTML = `
-    ${topbar(`<span class="modetag">${esc(modeName)}</span>`)}
+    ${topbar(`<span class="modetag">${esc(modeName)}</span><button class="navbtn exit" data-home>${g.mode === "casual" ? "Quit" : "Save & exit"}</button>`)}
     <div class="wrap">
       <section class="mbar" aria-label="Score and lineup">
         <div class="mbar-top"><span class="mb-pts"><b id="mtotal">${lastTotal.toFixed(1)}</b> PPR</span><span>Roll <b>${g.rollNumber}/7</b></span><span class="mb-grid">${Array.from({ length: 7 }, (_, i) => `<i class="${g.picks[i] ? g.picks[i].grade : i === g.picks.length ? "now" : ""}"></i>`).join("")}</span></div>
@@ -449,7 +450,8 @@
       </div>
     </div>`;
 
-    wireTopbar(g.mode !== "casual");
+    // casual: leave freely before the first pick, confirm after (nothing is saved). Others are saved and resumable.
+    wireTopbar(g.mode !== "casual" ? true : g.picks.length ? "casual" : false);
     if (enter) {
       window.scrollTo({ top: 0, behavior: "instant" in document.documentElement.style ? "instant" : "auto" });
       spinRoll(typeof enter === "string" ? enter : "both");

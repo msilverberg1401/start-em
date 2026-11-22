@@ -767,4 +767,4 @@ h1, h2, h3, h4 { margin: 0; }
 .remind b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 20px; margin-right: 6px; }
 .remind span { color: var(--ink-2); font-size: 15px; }
 .remind .btn { flex: none; }
-@media (max-width: 640px) { .remind { flex-direction: column; align-items: stretch; } .navbtn.app ~ .navbtn[data-how] { display: none; } }
+@media (max-width: 640px) { .remind { flex-direction: column; align-items: stretch; } .navbtn.app ~ .navbtn[data-how], .navbtn.exit ~ .navbtn[data-how] { display: none; } }
