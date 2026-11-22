@@ -1,12 +1,14 @@
-# Deploy with: npx wrangler deploy   (after `npx wrangler login`)
+# Deploy with: npx wrangler deploy   (after `npx wrangler login`), or paste share-worker.js in the Cloudflare dashboard.
 name = "start-em-share"
 main = "share-worker.js"
 compatibility_date = "2026-11-01"
 
-[vars]
-ORIGIN = "https://YOUR-GITHUB-USER.github.io/start-em/"
-SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co"
-SUPABASE_ANON_KEY = "YOUR-ANON-OR-PUBLISHABLE-KEY"
+# Only challenge links run through the worker; everything else goes straight to GitHub Pages.
+# (startem.app's DNS records must be Proxied / orange, with SSL/TLS mode "Full (strict)".)
+routes = [{ pattern = "startem.app/c/*", zone_name = "startem.app" }]
 
-# Then in the Cloudflare dashboard: Workers > start-em-share > Settings > Domains & Routes,
-# add your domain (e.g. startem.gg) so the whole site runs through this worker.
+[vars]
+SUPABASE_URL = "https://rcwmvwtlorrqlsmviuny.supabase.co"
+SUPABASE_ANON_KEY = "sb_publishable_Oormd2pLFnd6aBZwGwRqPA_Xn9Qt8SA"
+# Only used if the worker is ever put in front of the whole site (not needed with the /c/* route).
+ORIGIN = "https://msilverberg1401.github.io/start-em/"

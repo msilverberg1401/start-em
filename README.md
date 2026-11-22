@@ -89,11 +89,10 @@ $$);
 That sends one reminder a day at 10am ET. On iPhone, reminders only work after someone adds Start 'Em to their home screen (the site walks them through it).
 
 ### 8. Rich link previews for challenges (needs a custom domain)
-Every link gets the Start 'Em preview image from `og-image.png`. To make each challenge link show *that player's* card and score in iMessage, group chats and X, run the small Cloudflare Worker in `worker/` (free plan is plenty):
-1. Put your domain on Cloudflare (free), pointing at GitHub Pages as in the custom domain step.
-2. In `worker/wrangler.toml`, set `ORIGIN` (your Pages address), `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and the route for your domain.
-3. `cd worker && npx wrangler deploy`.
-4. GitHub Variables: add `SHARE_BASE` = `https://yourdomain.com`. Challenge links become `yourdomain.com/c/<id>`, and the worker serves the preview, then sends people into the challenge.
+Every link gets the Start 'Em preview image from `og-image.png`. To make each challenge link show *that player's* card and score in iMessage, group chats and X, run the small Cloudflare Worker in `worker/` (free plan is plenty). It only handles `/c/*` links; the rest of the site is served by GitHub Pages as usual.
+1. Put your domain on Cloudflare, pointing at GitHub Pages as in the custom domain step. Once GitHub shows HTTPS working, switch the DNS records to **Proxied** (orange) and set **SSL/TLS → Full (strict)**.
+2. Deploy `worker/share-worker.js` (`cd worker && npx wrangler deploy` with `wrangler.toml` filled in, or paste it in the dashboard) with vars `SUPABASE_URL` and `SUPABASE_ANON_KEY`, and the route `yourdomain.com/c/*`.
+3. GitHub Variables: add `SHARE_BASE` = `https://yourdomain.com` and rerun the site deploy. Challenge links become `yourdomain.com/c/<id>`; the worker serves the preview, then sends people into the challenge.
 
 Finished games upload their share card to the public `cards` storage bucket automatically; that's what the preview shows.
 
