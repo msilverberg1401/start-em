@@ -23,8 +23,10 @@ Deno.serve(async (req) => {
   let auth = null;
   const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   if (token) {
-    const { data } = await admin.auth.getUser(token);
-    if (data?.user) auth = { id: data.user.id, email: data.user.email };
+    // getClaims checks the token's signature locally (cached signing keys), skipping a round trip to the auth server
+    const { data } = await admin.auth.getClaims(token).catch(() => ({ data: null }));
+    const c = data?.claims;
+    if (c?.sub && c.role === "authenticated") auth = { id: c.sub, email: c.email };
   }
 
   const res = await handle({ body, auth, db });

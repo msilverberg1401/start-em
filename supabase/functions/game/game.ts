@@ -1,6 +1,10 @@
 // @ts-nocheck
 import rolls from "./rolls.json" with { type: "json" };
 
+// rolls.json stores headshots as "p:<id>" / "u:<id>" to stay small; expand once at load
+const HEAD = { "p:": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/", "u:": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/" };
+for (const r of rolls) for (const p of r.players) if (p.head && HEAD[p.head.slice(0, 2)]) p.head = HEAD[p.head.slice(0, 2)] + p.head.slice(2);
+
 export const ROLLS = rolls;
 const BY_KEY = new Map(rolls.map((r) => [r.key, r]));
 export const getRoll = (k) => BY_KEY.get(k);

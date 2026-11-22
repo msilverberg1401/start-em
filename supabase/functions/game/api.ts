@@ -140,14 +140,19 @@ const actions = {
     if (!auth) return { signedIn: false, today, dailyNumber: dailyNumber(today), theme };
     const profile = await db.getProfile(auth.id);
     if (!profile) return { signedIn: true, email: auth.email, username: null, today, dailyNumber: dailyNumber(today), theme };
+    // independent lookups, so run them together instead of one after another
+    const [dailyDone, dailyGame, ranked, rankedGame, dates, groups] = await Promise.all([
+      db.getDaily(today, auth.id),
+      db.findGame({ user_id: auth.id, mode: "daily", play_date: today, status: "active" }),
+      db.getRanked(auth.id),
+      db.findGame({ user_id: auth.id, mode: "ranked", status: "active" }),
+      db.dailyDates(auth.id),
+      db.myGroups(auth.id),
+    ]);
     return {
       signedIn: true, email: auth.email, username: profile.username, today, dailyNumber: dailyNumber(today), theme,
-      dailyDone: await db.getDaily(today, auth.id),
-      dailyActive: !!(await db.findGame({ user_id: auth.id, mode: "daily", play_date: today, status: "active" })),
-      ranked: withTier(await db.getRanked(auth.id)),
-      rankedActive: !!(await db.findGame({ user_id: auth.id, mode: "ranked", status: "active" })),
-      streak: streaks(await db.dailyDates(auth.id), today),
-      groups: await db.myGroups(auth.id),
+      dailyDone, dailyActive: !!dailyGame, ranked: withTier(ranked), rankedActive: !!rankedGame,
+      streak: streaks(dates, today), groups,
     };
   },
 

@@ -94,5 +94,12 @@ for (y,t),grp in g.groupby(['season','team']):
                 # usage per game for Casual's stats-on view (opportunity, not results)
                 u=usage(p, r)))
     rolls.append(dict(key=f'{y}-{abbr}',season=int(y),team=abbr,teamName=full,players=players))
+# shorten headshot URLs: game.ts expands "p:"/"u:" back to the full nfl.com address
+PRE={'https://static.www.nfl.com/image/private/f_auto,q_auto/league/':'p:','https://static.www.nfl.com/image/upload/f_auto,q_auto/league/':'u:'}
+for r in rolls:
+    for pl in r['players']:
+        h=pl.get('head')
+        for full,short in PRE.items():
+            if h and h.startswith(full): pl['head']=short+h[len(full):]
 json.dump(rolls,open(out,'w'),separators=(',',':'))
 print(len(rolls),'team-seasons', os.path.getsize(out)//1024,'KB')
