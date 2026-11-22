@@ -185,7 +185,7 @@
       <dl class="modes-dl">
         <dt>Daily</dt><dd>Same seven teams for everyone, once a day, no rerolls. New one at midnight ET. Some days have a theme: Throwback Thursday (1999–2009 only), Division Sunday (one division), plus specials like the Thanksgiving Daily.</dd>
         <dt>Ranked</dt><dd>The ball-knowledge ladder. Deeper rosters full of backups and one-game guys, one of each reroll, no restarting. Your SR goes up or down each game based on your pick accuracy versus what's expected at your level. Climb from Rookie through Starter, Pro Bowl, All-Pro and MVP. Hall of Fame is for the best of the best.</dd>
-        <dt>Casual</dt><dd>Stats on: every player shows how much he got the ball per game (carries, catches, pass attempts), his NFL experience and games played. One of each reroll. No login needed.</dd>
+        <dt>Casual</dt><dd>Stats on: every player shows how much he got the ball per game (carries, catches, pass attempts) and games played. One of each reroll. No login needed.</dd>
       </dl>
       <h3 class="sheet-sub">Play with friends</h3>
       <p>After any game, hit <b>Challenge a friend</b> to send them your exact seven teams and see who wins head to head. Make a <b>group</b> with a code to get private standings for your league or group chat, next to the global ones.</p>
@@ -319,7 +319,7 @@
         </button>
         <button class="mode casual" data-mode="casual">
           <div class="ph"><h3>Casual</h3><span class="aside">Stats on</span></div>
-          <p>See how much each player got the ball per game, plus experience and games played. One of each reroll. No login needed.</p>
+          <p>See how much each player got the ball per game and how many games he played. One of each reroll. No login needed.</p>
           <div class="foot"><span>Just for fun</span><em>Play</em></div>
         </button>
       </div>
@@ -441,9 +441,9 @@
     const groups = ["QB", "RB", "WR", "TE"].map((pos) => [pos, g.roll.players.filter((p) => p.pos === pos)]);
     const modeName = g.mode === "challenge" ? `Challenge vs ${g.challenge?.opponentName || "a friend"}` : g.mode === "archive" ? `Past Daily #${g.number}` : { daily: `Daily #${g.number}`, ranked: "Ranked", casual: "Casual" }[g.mode];
     const hints = g.rules?.hints;
-    const exp = (p) => p.yr === 1 ? "Rookie" : p.yr ? `Year ${p.yr}` : "Veteran";
     const n = (v, one, many) => `${v} ${v === 1 ? one : many}`;
-    const usageText = (p) => !p.u ? "" : p.pos === "QB" ? `${n(p.u.att, "pass att", "pass att")} · ${n(p.u.car, "rush", "rushes")} per game` : p.pos === "RB" ? `${n(p.u.car, "carry", "carries")} · ${n(p.u.rec, "catch", "catches")} per game` : `${n(p.u.rec, "catch", "catches")} per game`;
+    // short enough to stay on one line on a phone: per-game usage only
+    const usageText = (p) => !p.u ? "" : p.pos === "QB" ? `${n(p.u.att, "att", "att")} · ${n(p.u.car, "rush", "rush")} /g` : p.pos === "RB" ? `${n(p.u.car, "car", "car")} · ${n(p.u.rec, "rec", "rec")} /g` : `${n(p.u.rec, "catch", "catches")} /g`;
     const targets = selected ? open.filter((s) => accepts(s, selected.pos)) : [];
     const spotChoices = [...new Map(targets.map((s) => [SLOT_LABEL[s], s])).entries()].reverse();
     const counts = { best: 0, close: 0, miss: 0 }; g.picks.forEach((p) => counts[p.grade]++);
@@ -489,11 +489,11 @@
               <div class="rseg"><span class="rk">Swap the year, keep the ${esc(g.roll.teamName.split(" ").slice(-1)[0])}</span><button class="btn ghost" data-reroll="year" ${g.rerolls.year ? "" : "disabled"} title="Same team, different season">New year <i>${g.rerolls.year}</i></button></div>
             </div>`}
           <div class="list">
-            <div class="sub">${hints ? "Stats on: how much the ball came his way each game, plus experience and games played. Yards and touchdowns are up to you." : g.rules?.deep ? "Deep roster. Pick one player. His stats stay hidden until he's in your lineup." : "Pick one player. His stats stay hidden until he's in your lineup."}</div>
+            <div class="sub">${hints ? "Stats on: how much the ball came his way each game, and games played. Yards and touchdowns are up to you." : g.rules?.deep ? "Deep roster. Pick one player. His stats stay hidden until he's in your lineup." : "Pick one player. His stats stay hidden until he's in your lineup."}</div>
             ${groups.map(([pos, ps]) => !ps.length ? "" : !open.some((s) => accepts(s, pos)) ? `<h4 class="filled-pos">${POS_NAME[pos]} <span>${pos} spot${pos === "RB" || pos === "WR" ? "s" : ""} filled</span></h4>` : `<h4>${POS_NAME[pos]}</h4>${ps.map((p) => `
               <button class="prow" style="--pc:${PC[pos]}" data-pid="${esc(p.id)}" aria-pressed="${selected?.id === p.id}" ${usable(p) ? "" : "disabled"}>
                 ${face(p)}
-                <span><span class="nm">${esc(p.name)}</span>${p.taken ? `<span class="meta"><br>Already in your lineup</span>` : hints ? `<span class="meta"><br>${exp(p)} · ${p.g} ${p.g === 1 ? "game" : "games"}</span><br><span class="usage">${usageText(p)}</span>` : usable(p) ? "" : `<span class="meta"><br>${pos} spot filled</span>`}</span>
+                <span><span class="nm">${esc(p.name)}</span>${p.taken ? `<span class="meta"><br>Already in your lineup</span>` : hints ? ` <span class="gms">${p.g} ${p.g === 1 ? "game" : "games"}</span><br><span class="usage">${usageText(p)}</span>` : usable(p) ? "" : `<span class="meta"><br>${pos} spot filled</span>`}</span>
                 <span class="pos p-${pos}">${pos}</span>
                 <span class="go">Start</span>
               </button>`).join("")}`).join("")}
@@ -615,6 +615,16 @@
           <div class="txt"><span>Pick accuracy <b>${r.pct}%</b> of the best lineup your teams allowed</span><span>${r.record.wins === 14 ? "Perfect season." : ""}</span></div>
           <div class="track"><div class="fill" id="fill"></div></div>
         </div>
+        <div class="quick-share">
+          <button class="btn yel big" id="share">Share result</button>
+          <button class="btn navy big" id="challenge">Challenge a friend</button>
+        </div>
+      </section>
+
+      ${r.ranked ? srPanel(r.ranked) : ""}
+
+      <section class="panel matchup picks">
+        <div class="ph"><h2>Your picks vs the perfect lineup</h2><span class="aside">You · Best on each roll</span></div>
         <div class="turf field-rows">
         ${ORDER.map((s) => {
           const a = mine[s], b = perf[s];
@@ -628,31 +638,27 @@
           </div>`;
         }).join("")}
         </div>
+        <div class="callouts">
+            <div class="callout good"><span>Best start</span><b>${esc(r.bestPick.name)}</b>, ${r.bestPick.pts.toFixed(1)} pts (${r.bestPick.season} ${esc(r.bestPick.team)})</div>
+            ${r.biggestMiss ? `<div class="callout bad"><span>Biggest miss</span><b>${esc(r.biggestMiss.name)}</b> over ${esc(r.biggestMiss.instead)} cost you ${r.biggestMiss.lost.toFixed(1)}</div>` : `<div class="callout good"><span>Biggest miss</span>None. Every pick was the best on its roll.</div>`}
+          </div>
       </section>
-
-      ${r.ranked ? srPanel(r.ranked) : ""}
-      ${g.mode === "daily" ? reminderBar() : ""}
-      ${g.mode === "daily" || g.mode === "archive" ? `<section class="panel dstats" id="dstats"><div class="ph"><h2>How everyone played Daily #${g.number}</h2><span class="aside">Loading…</span></div></section>` : ""}
 
       <div class="after">
         <div class="share-card"><img id="shareimg" alt="Your shareable Start 'Em result card"></div>
         <div class="share-side">
-          <h3>Send it to the group chat</h3>
-          <p>Post your card, or challenge a friend to the exact same seven teams${g.mode === "daily" ? ". They'll play today's Daily and see how they stack up against you" : ""}.</p>
-          <button class="btn yel big" id="share">Share result</button>
-          <div class="share-more">
-            <button class="btn navy" id="challenge">Challenge a friend</button>
-          </div>
+          <h3>Your card</h3>
+          <p>Save it for your story, or copy the text for a group chat${g.mode === "daily" ? ". A challenge link sends friends to today's Daily" : ""}.</p>
           <div class="share-more">
             <button class="btn ghost" id="copytext">Copy text</button>
             <button class="btn ghost" id="saveimg">Save image</button>
           </div>
-          <div class="callouts">
-            <div class="callout good"><span>Best start</span><b>${esc(r.bestPick.name)}</b>, ${r.bestPick.pts.toFixed(1)} pts (${r.bestPick.season} ${esc(r.bestPick.team)})</div>
-            ${r.biggestMiss ? `<div class="callout bad"><span>Biggest miss</span><b>${esc(r.biggestMiss.name)}</b> over ${esc(r.biggestMiss.instead)} cost you ${r.biggestMiss.lost.toFixed(1)}</div>` : `<div class="callout good"><span>Biggest miss</span>None. Every pick was the best on its roll.</div>`}
-          </div>
         </div>
       </div>
+
+      ${g.mode === "daily" || g.mode === "archive" ? `<section class="panel dstats" id="dstats"><div class="ph"><h2>How everyone played Daily #${g.number}</h2><span class="aside">Loading…</span></div></section>` : ""}
+      ${g.mode === "daily" ? reminderBar() : ""}
+
       <div class="res-actions">
         ${g.mode === "ranked" || g.mode === "casual" ? `<button class="btn navy big" id="again">Play ${g.mode} again</button>` : g.mode === "archive" || g.mode === "daily" ? `<button class="btn navy big" id="morepast">Play past Dailies</button>` : ""}
         <button class="btn ghost" id="back">Back to standings</button>
