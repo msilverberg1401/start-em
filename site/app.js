@@ -232,14 +232,6 @@
             <button class="btn navy big" data-how2>How to play</button>
           </div>
         </div>
-        <aside class="turf dream" aria-label="An empty lineup waiting for your picks">
-          <div class="ph"><h2>Your lineup</h2><span class="aside">7 spots, 7 rolls</span></div>
-          <div class="dream-rec">
-            <div class="board"><div class="bulbs">?-?</div></div>
-            <div class="tot"><b>861</b><span>team-seasons in the pool</span></div>
-          </div>
-          ${["QB", "RB1", "RB2", "WR1", "WR2", "TE", "FLEX"].map((s, i) => `<div class="slot ${i === 0 ? "t ghost" : ""}"><span class="s ${s === "FLEX" ? "sm" : ""}">${SLOT_LABEL[s]}</span><span class="p"><div class="meta">${i === 0 ? "Roll 1 is waiting" : s === "FLEX" ? "Open · RB, WR or TE" : "Open"}</div></span><span></span></div>`).join("")}
-        </aside>
       </section>
 
       <div class="modes">
