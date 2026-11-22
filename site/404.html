@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Start 'Em</title>
+<script>
+  // GitHub Pages serves this for unknown paths. Challenge links (/c/<id>) normally go through the
+  // Cloudflare worker; if it's ever bypassed, send people straight into the challenge instead of a 404.
+  (function () {
+    var m = location.pathname.match(/\/c\/([0-9a-f-]{36})\/?$/i);
+    var base = location.pathname.replace(/\/c\/[^/]*\/?$/, "/").replace(/[^/]*$/, "");
+    location.replace(m ? base + "?c=" + m[1] : "/");
+  })();
+</script>
+</head>
+<body><a href="/">Go to Start 'Em</a></body>
+</html>
