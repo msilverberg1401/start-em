@@ -543,7 +543,7 @@
           <div class="ph"><h2>Your lineup</h2><span class="aside">${g.picks.length} of 7 filled</span></div>
           ${g.slots.map((s) => {
             const p = filled[s];
-            if (p) return `<div class="slot f ${p === g.picks[g.picks.length - 1] && !enter ? "just" : ""}" style="--c:${tc(p.team)[0]}"><span class="s ${s === "FLEX" ? "sm" : ""}">${SLOT_LABEL[s]}</span><span class="p"><div class="nm"><span class="dot d-${p.grade}"></span>${esc(p.player.name)}${irTag(p.player)}</div><div class="meta">${p.season} ${esc(p.teamName)} · ${p.player.pos}${p.player.rank}</div></span><span class="pt">${p.player.pts.toFixed(1)}</span></div>`;
+            if (p) return `<div class="slot f ${p === g.picks[g.picks.length - 1] && !enter ? "just" : ""}" style="--c:${tc(p.team)[0]}"><span class="s ${s === "FLEX" ? "sm" : ""}">${SLOT_LABEL[s]}</span><span class="p"><div class="nm"><span class="dot d-${p.grade}"></span>${esc(p.player.name)}</div><div class="meta">${p.season} ${esc(p.teamName)} · ${p.player.pos}${p.player.rank}</div></span><span class="pt">${p.player.pts.toFixed(1)}</span></div>`;
             if (targets.includes(s)) return `<button class="slot t" data-slot="${s}"><span class="s ${s === "FLEX" ? "sm" : ""}">${SLOT_LABEL[s]}</span><span class="p"><div class="nm">Start ${esc(selected.name.split(" ").slice(-1)[0])} here</div></span><span class="pt">Tap</span></button>`;
             return `<div class="slot"><span class="s ${s === "FLEX" ? "sm" : ""}">${SLOT_LABEL[s]}</span><span class="p"><div class="meta">${s === "FLEX" ? "Open · RB, WR or TE" : "Open"}</div></span><span></span></div>`;
           }).join("")}
@@ -597,19 +597,22 @@
     const ov = document.createElement("div");
     ov.className = "reveal-wrap";
     ov.innerHTML = `<div class="card" role="dialog" aria-modal="true" aria-label="${esc(pl.name)}" style="--team:${t1};--team-2:${t2}">
-      <div class="card-top">${posTile(pl.pos)}<div><div class="nm">${esc(pl.name)}<span data-ir></span></div><div class="sub">${pk.season} ${esc(pk.teamName)} · ${pk.slot === "FLEX" ? `FLEX (${pl.pos})` : pl.pos}</div></div></div>
+      <div class="card-top">${posTile(pl.pos)}<div><div class="nm">${esc(pl.name)}</div><div class="sub">${pk.season} ${esc(pk.teamName)} · ${pk.slot === "FLEX" ? `FLEX (${pl.pos})` : pl.pos}</div></div></div>
       <div class="card-pts"><div class="big pending" id="cardpts">0.0</div><div class="unit">PPR points</div></div>
       <div class="card-stats">
         <div><b data-ppg>–</b>Per game</div>
         <div><b data-g>–</b>Games</div>
         <div><b data-fin>–</b>Finish</div>
       </div>
-      <div class="verdict pending" data-verdict>&nbsp;</div><div data-hurt></div>
+      <div class="verdict pending" data-verdict>&nbsp;</div>
       <button class="btn" id="next" disabled>Next roll</button>
     </div>`;
     document.body.appendChild(ov);
     const big = $("#cardpts", ov);
     let prevTotal = 0, ready = false;
+    // slot-machine spin while the server answers; it runs at least ~0.55s so the reveal feels deliberate
+    const spinStart = performance.now(), still = reduceMotion();
+    const spin = still ? 0 : setInterval(() => { big.textContent = (Math.random() * 380).toFixed(1); }, 55);
     const go = () => {
       if (!ready) return;
       ov.remove(); document.removeEventListener("keydown", key);
@@ -621,11 +624,17 @@
     $("#next", ov).addEventListener("click", go);
     document.addEventListener("keydown", key);
     return {
-      cancel() { ov.remove(); document.removeEventListener("keydown", key); },
+      cancel() { clearInterval(spin); ov.remove(); document.removeEventListener("keydown", key); },
       fill(pk, prev) {
+        const wait = still ? 0 : Math.max(0, 550 - (performance.now() - spinStart));
+        setTimeout(() => land(pk, prev), wait);
+      },
+    };
+    function land(pk, prev) {
+      clearInterval(spin);
+      {
         const pl = pk.player; prevTotal = prev; ready = true;
         $(".card", ov).setAttribute("aria-label", `${pl.name} scored ${pl.pts} points`);
-        $("[data-ir]", ov).outerHTML = irTag(pl);
         $("[data-ppg]", ov).textContent = pl.ppg.toFixed(1);
         $("[data-g]", ov).textContent = pl.g;
         $("[data-fin]", ov).textContent = `${pl.pos}${pl.rank}`;
@@ -633,13 +642,13 @@
         v.className = `verdict ${pk.grade}`;
         v.innerHTML = pk.grade === "best" ? "Best start on the roll for that spot."
           : `${esc(pk.best.name)} had ${pk.best.pts.toFixed(1)} for this spot. ${pk.grade === "close" ? "Close." : "That one hurts."}`;
-        if (pl.hurt) $("[data-hurt]", ov).outerHTML = `<p class="hurt-note">Injured this year: missed ${pl.hurt} ${pl.hurt === 1 ? "game" : "games"}.</p>`;
         const nx = $("#next", ov); nx.disabled = false; nx.textContent = game.status === "done" ? "See your season" : "Next roll"; nx.focus();
         big.classList.remove("pending");
-        const t0 = performance.now();
-        (function tick(t) { const k = reduceMotion() ? 1 : Math.min(1, (t - t0) / 800); big.textContent = (pl.pts * (1 - Math.pow(1 - k, 3))).toFixed(1); if (k < 1) requestAnimationFrame(tick); })(t0);
-      },
-    };
+        // ease from the last spinning number onto the real score
+        const from = parseFloat(big.textContent) || 0, t0 = performance.now();
+        (function tick(t) { const k = still ? 1 : Math.min(1, (t - t0) / 380); big.textContent = (from + (pl.pts - from) * (1 - Math.pow(1 - k, 3))).toFixed(1); if (k < 1) requestAnimationFrame(tick); })(t0);
+      }
+    }
   }
 
   // ================= RESULTS: matchup =================
@@ -689,11 +698,11 @@
           const a = mine[s], b = perf[s];
           const same = a.player.id === b.player.id;
           return `<div class="mrow">
-            <div class="pl"><div><div class="nm"><span class="dot d-${a.grade}"></span>${esc(a.player.name)}${irTag(a.player)}</div><div class="yr">${a.season} ${esc(a.team)} <b>· ${a.player.pts.toFixed(1)}</b></div></div></div>
+            <div class="pl"><div><div class="nm"><span class="dot d-${a.grade}"></span>${esc(a.player.name)}</div><div class="yr">${a.season} ${esc(a.team)} <b>· ${a.player.pts.toFixed(1)}</b></div></div></div>
             <span class="pt ${same ? "same" : ""}">${a.player.pts.toFixed(1)}</span>
             <span class="mid"><span class="pos p-${SLOT_LABEL[s]}">${SLOT_LABEL[s]}</span></span>
             <span class="pt r">${b.player.pts.toFixed(1)}</span>
-            <div class="pl r"><div><div class="nm">${esc(b.player.name)}${irTag(b.player)}</div><div class="yr">${b.season} ${esc(b.rollKey.split("-")[1])} <b>· ${b.player.pts.toFixed(1)}</b></div></div></div>
+            <div class="pl r"><div><div class="nm">${esc(b.player.name)}</div><div class="yr">${b.season} ${esc(b.rollKey.split("-")[1])} <b>· ${b.player.pts.toFixed(1)}</b></div></div></div>
           </div>`;
         }).join("")}
         </div>
@@ -837,8 +846,6 @@
       start("archive", x.date);
     }));
   }
-
-  const irTag = (pl) => pl && pl.hurt ? `<span class="ir" title="Injured: missed ${pl.hurt} games">IR</span>` : "";
 
   // ================= VIDEO FOR TIKTOK / REELS =================
   async function videoSheet(g, link) {

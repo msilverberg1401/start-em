@@ -131,7 +131,7 @@ export function publicRoll(key, rules, taken = new Set()) {
     }),
   };
 }
-export const reveal = (p) => ({ id: p.id, name: p.name, pos: p.pos, pts: p.pts, ppg: p.ppg, g: p.g, rank: p.rank, ...(p.hurt ? { hurt: p.hurt } : {}) });
+export const reveal = (p) => ({ id: p.id, name: p.name, pos: p.pos, pts: p.pts, ppg: p.ppg, g: p.g, rank: p.rank });
 
 // ---------- scoring ----------
 const bestFor = (roll, slot, exclude = new Set()) => {

@@ -906,10 +906,6 @@ html[data-theme="dark"] .day.hot b { color: var(--on-yel); }
 .lb tbody tr:nth-child(3) { background: linear-gradient(90deg, rgba(196,128,72,.30), transparent 60%); }
 html[data-theme="dark"] .lb tbody tr:nth-child(2) { background: linear-gradient(90deg, rgba(190,200,214,.22), transparent 60%); }
 html[data-theme="dark"] .lb tbody tr:nth-child(3) { background: linear-gradient(90deg, rgba(205,127,50,.24), transparent 60%); }
-/* injured that season: tag after the player's name once he's picked */
-.ir { display: inline-block; margin-left: 6px; padding: 1px 5px 0; border-radius: 4px; background: #d93a3a; color: #fff; font-family: inherit; font-size: 10px; font-weight: 800; line-height: 1.4; letter-spacing: .04em; vertical-align: 2px; font-style: normal; }
-.hurt-note { margin: 8px 0 0; font-size: 13px; font-weight: 600; color: #d93a3a; text-align: center; }
-html[data-theme="dark"] .hurt-note { color: #ff7a7a; }
 .matchup .quick-share .again-row { grid-column: 1 / -1; }
 
 /* big screens: scale the whole site down a notch so more fits without scrolling */
@@ -928,7 +924,6 @@ html[data-theme="dark"] .hurt-note { color: #ff7a7a; }
   .play > .lineup { max-height: calc(100vh / .82 - 32px); }
 }
 /* reveal card while the server answers: points pulse, verdict is a quiet placeholder */
-.card-pts .big.pending { animation: ptsPulse .8s ease-in-out infinite; opacity: .35; }
-@keyframes ptsPulse { 50% { opacity: .12; } }
+.card-pts .big.pending { opacity: .55; }
 .verdict.pending { background: var(--line-2); min-height: 22px; }
 .card #next:disabled { opacity: .5; cursor: default; }
