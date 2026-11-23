@@ -167,6 +167,12 @@
   const tierBadge = (t, sm = "") => t ? `<span class="tier-badge t-${t.key} ${sm}"><svg viewBox="0 0 24 24" aria-hidden="true">${TIER_ICON[t.key] || ""}</svg>${esc(t.label)}</span>` : "";
   const makeLink = (kind, val) => kind === "c" && CFG.shareBase ? `${CFG.shareBase.replace(/\/$/, "")}/c/${val}` : CFG.hashLinks ? `${SITE_URL}#${kind}-${val}` : `${SITE_URL}${SITE_URL.includes("?") ? "&" : "?"}${kind}=${val}`;
 
+  // first-game guide: three one-time tips during a new player's first game. 0 = new, 3 = done.
+  // Anyone who has already opened How to play (or played before this existed) skips it.
+  const guideStep = () => { try { const v = localStorage.getItem("se_guide"); if (v == null && localStorage.getItem("se_seen_how")) return 3; return Number(v || 0); } catch { return 3; } };
+  const setGuide = (n) => { try { localStorage.setItem("se_guide", String(Math.max(n, guideStep()))); } catch {} };
+  const guideTip = (html, step) => `<div class="guide" role="note"><span class="g-lbl">First game</span><p>${html}</p><button class="g-x" data-guide-x="${step}" aria-label="Hide tip">Got it</button></div>`;
+
   function howToPlay() {
     localStorage.setItem("se_seen_how", "1");
     sheet(`
@@ -371,7 +377,6 @@
       lbTab = b.dataset.tab; app.querySelectorAll("[data-tab]").forEach((x) => x.setAttribute("aria-selected", x === b)); loadBoard();
     }));
     loadBoard();
-    if (!localStorage.getItem("se_seen_how")) howToPlay();
   }
 
   // last standings shown per tab/group, painted instantly while fresh ones load
@@ -524,6 +529,10 @@
               <div class="rseg"><span class="rk">Swap the team, keep ${g.roll.season}</span><button class="btn ghost" data-reroll="team" ${g.rerolls.team ? "" : "disabled"} title="Same season, different team">New team <i>${g.rerolls.team}</i></button></div>
               <div class="rseg"><span class="rk">Swap the year, keep the ${esc(g.roll.teamName.split(" ").slice(-1)[0])}</span><button class="btn ghost" data-reroll="year" ${g.rerolls.year ? "" : "disabled"} title="Same team, different season">New year <i>${g.rerolls.year}</i></button></div>
             </div>`}
+          ${guideStep() === 0 && !g.picks.length ? guideTip(`This is the <b>${g.roll.season} ${esc(g.roll.teamName)}</b>. Tap the one player you think scored the most fantasy points (full PPR) that season.`, 1) : ""}
+          ${guideStep() === 1 && g.picks.length === 1 ? guideTip(g.rerolls && (g.rerolls.team || g.rerolls.year) && g.mode !== "daily" && g.mode !== "archive"
+            ? `Rough roll? <b>New team</b> keeps the season and swaps the team. <b>New year</b> keeps the team and swaps the season. One of each per game.`
+            : `Six more rolls to fill your lineup. Every player in the Daily gets these same seven teams, so it's pure picking.`, 2) : ""}
           <div class="list">
             <div class="sub">${hints ? "Stats on: how much the ball came his way each game, and games played. Yards and touchdowns are up to you." : g.rules?.deep ? "Deep roster. Pick one player. His stats stay hidden until he's in your lineup." : "Pick one player. His stats stay hidden until he's in your lineup."}</div>
             ${groups.map(([pos, ps]) => !ps.length ? "" : !open.some((s) => accepts(s, pos)) ? `<h4 class="filled-pos">${POS_NAME[pos]} <span>${pos} spot${pos === "RB" || pos === "WR" ? "s" : ""} filled</span></h4>` : `<h4>${POS_NAME[pos]}</h4>${ps.map((p) => `
@@ -557,6 +566,7 @@
       window.scrollTo({ top: 0, behavior: "instant" in document.documentElement.style ? "instant" : "auto" });
       spinRoll(typeof enter === "string" ? enter : "both");
     }
+    app.querySelectorAll("[data-guide-x]").forEach((b) => b.addEventListener("click", () => { setGuide(Number(b.dataset.guideX)); b.closest(".guide").remove(); }));
     app.querySelectorAll(".prow").forEach((b) => b.addEventListener("click", () => {
       const p = g.roll.players.find((x) => x.id === b.dataset.pid);
       selected = selected?.id === p.id ? null : p;
@@ -638,6 +648,10 @@
         v.className = `verdict ${pk.grade}`;
         v.innerHTML = pk.grade === "best" ? "Best start on the roll for that spot."
           : `${esc(pk.best.name)} had ${pk.best.pts.toFixed(1)} for this spot. ${pk.grade === "close" ? "Close." : "That one hurts."}`;
+        if (guideStep() === 0) {
+          v.insertAdjacentHTML("afterend", `<p class="g-card">Your picks get a dot: <b class="gd best"></b> best on the roll, <b class="gd close"></b> close, <b class="gd miss"></b> a miss. Highest seven-player total wins.</p>`);
+          setGuide(1);
+        } else if (guideStep() === 1 && game.picks.length >= 2) setGuide(3);
         const nx = $("#next", ov); nx.disabled = false; nx.textContent = game.status === "done" ? "See your season" : "Next roll"; nx.focus();
         big.classList.remove("pending");
         const t0 = performance.now();
