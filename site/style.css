@@ -919,3 +919,11 @@ html[data-theme="dark"] .hurt-note { color: #ff7a7a; }
   body { min-height: calc(100vh / .82); }
 }
 .sheet:focus { outline: none; }
+
+/* computer: lineup stays in view while you scroll the roster */
+@media (min-width: 961px) {
+  .play > .lineup { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
+}
+@media (min-width: 1100px) {
+  .play > .lineup { max-height: calc(100vh / .82 - 32px); }
+}
