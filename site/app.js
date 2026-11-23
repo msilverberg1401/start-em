@@ -140,7 +140,8 @@
     $(".sheet-x", wrap).addEventListener("click", close);
     document.addEventListener("keydown", key);
     document.body.appendChild(wrap);
-    setTimeout(() => $("input, .btn", wrap)?.focus(), 30);
+    // focus a text box if there is one; otherwise the dialog itself, so long sheets (How to play) open at the top
+    setTimeout(() => { const f = $("input", wrap) || $(".sheet", wrap); if (f === $(".sheet", wrap)) f.tabIndex = -1; f?.focus({ preventScroll: true }); $(".sheet", wrap).scrollTop = 0; }, 30);
     return { el: wrap, close };
   }
 

@@ -918,3 +918,4 @@ html[data-theme="dark"] .hurt-note { color: #ff7a7a; }
   .wrap { max-width: 1400px; }
   body { min-height: calc(100vh / .82); }
 }
+.sheet:focus { outline: none; }
