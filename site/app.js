@@ -365,7 +365,7 @@
       const d = await api("leaderboard", { board: lbTab, group: lbGroup });
       if (!d.rows.length) {
         const who = lbGroup ? "in this group" : "";
-        el.innerHTML = `<div class="lb-empty">${lbTab === "daily" ? `Nobody ${who} has finished today's Daily yet. Play it and take the top spot.` : lbTab === "week" ? `Nobody ${who} has played a Daily this week yet. The week resets every Tuesday.` : lbTab === "ranked" ? `Nobody ${who} is on the ladder yet. Finish 5 Ranked placement games to show up here.` : `No lineups ${who} yet. Finish a Daily or Ranked game to set the record.`}</div>`;
+        el.innerHTML = `<div class="lb-empty">${lbTab === "daily" ? `Nobody ${who} has finished today's Daily yet. Play it and take the top spot.` : lbTab === "week" ? `Nobody ${who} has played a Daily this week yet. The week resets every Tuesday.` : lbTab === "ranked" ? `Nobody ${who} is on the ladder yet. Finish 5 Ranked placement games to show up here.` : `No lineups ${who} yet. Log in and finish a Daily or Ranked game to set the record. Casual, challenges and past Dailies don't count.`}</div>`;
         return;
       }
       const head = lbTab === "daily" ? "<th class='num'>Points</th><th>Season</th><th class='num hide-sm'>Accuracy</th><th class='hide-sm'>Picks</th>"
@@ -380,6 +380,7 @@
           : lbTab === "ranked" ? `<td>${tierBadge(r.tier, "sm")}</td><td class="num pts">${r.sr}</td><td class="num hide-sm">${r.games}</td>`
           : `<td class="num pts">${r.total.toFixed(1)} <span class="season-badge sm ${r.record === "14-0" ? "perfect" : ""}">${r.record}</span></td><td class="hide-sm lineup-cell">${r.lineup.map((l) => `${esc(l.name)} '${String(l.season).slice(2)}`).join(", ")}</td>`
         }</tr>`).join("")}</tbody></table>
+        ${lbTab === "alltime" ? `<p class="lb-note">Daily and Ranked games only, one best lineup per player. Casual, challenges and past Dailies don't count. Log in to get on the board.</p>` : ""}
         ${lbTab === "week" ? `<p class="lb-note">Every Daily from ${shortDate(d.from)} to ${shortDate(weekEnd(d.from))} added up. Play every day to climb. Resets Tuesday.</p>` : ""}
         ${lbTab === "daily" ? `<p class="lb-note">${d.players} ${lbGroup ? "in this group " : ""}played Daily #${d.number}. Everyone had the same teams, so it's ranked by points.</p>` : ""}`;
     } catch (e) { el.innerHTML = `<div class="lb-empty">Couldn't load the standings. ${esc(e.message)}</div>`; }
