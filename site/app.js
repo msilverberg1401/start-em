@@ -610,9 +610,7 @@
     document.body.appendChild(ov);
     const big = $("#cardpts", ov);
     let prevTotal = 0, ready = false;
-    // slot-machine spin while the server answers; it runs at least ~0.55s so the reveal feels deliberate
-    const spinStart = performance.now(), still = reduceMotion();
-    const spin = still ? 0 : setInterval(() => { big.textContent = (Math.random() * 380).toFixed(1); }, 55);
+    const still = reduceMotion();
     const go = () => {
       if (!ready) return;
       ov.remove(); document.removeEventListener("keydown", key);
@@ -624,14 +622,12 @@
     $("#next", ov).addEventListener("click", go);
     document.addEventListener("keydown", key);
     return {
-      cancel() { clearInterval(spin); ov.remove(); document.removeEventListener("keydown", key); },
+      cancel() { ov.remove(); document.removeEventListener("keydown", key); },
       fill(pk, prev) {
-        const wait = still ? 0 : Math.max(0, 550 - (performance.now() - spinStart));
-        setTimeout(() => land(pk, prev), wait);
+        land(pk, prev);
       },
     };
     function land(pk, prev) {
-      clearInterval(spin);
       {
         const pl = pk.player; prevTotal = prev; ready = true;
         $(".card", ov).setAttribute("aria-label", `${pl.name} scored ${pl.pts} points`);
@@ -644,9 +640,8 @@
           : `${esc(pk.best.name)} had ${pk.best.pts.toFixed(1)} for this spot. ${pk.grade === "close" ? "Close." : "That one hurts."}`;
         const nx = $("#next", ov); nx.disabled = false; nx.textContent = game.status === "done" ? "See your season" : "Next roll"; nx.focus();
         big.classList.remove("pending");
-        // ease from the last spinning number onto the real score
-        const from = parseFloat(big.textContent) || 0, t0 = performance.now();
-        (function tick(t) { const k = still ? 1 : Math.min(1, (t - t0) / 380); big.textContent = (from + (pl.pts - from) * (1 - Math.pow(1 - k, 3))).toFixed(1); if (k < 1) requestAnimationFrame(tick); })(t0);
+        const t0 = performance.now();
+        (function tick(t) { const k = still ? 1 : Math.min(1, (t - t0) / 800); big.textContent = (pl.pts * (1 - Math.pow(1 - k, 3))).toFixed(1); if (k < 1) requestAnimationFrame(tick); })(t0);
       }
     }
   }
