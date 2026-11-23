@@ -981,3 +981,9 @@ html[data-theme="dark"] .matchup .mrow .yr { color: #56667D; }
 .st-wrap { overflow-x: auto; }
 .lb.st-table tbody tr, html[data-theme="dark"] .lb.st-table tbody tr { background: none; }
 .st-funnel { max-width: 720px; }
+/* social links in the footer */
+.site-foot.social { display: flex; justify-content: center; align-items: center; gap: 14px; margin-bottom: -6px; }
+.site-foot.social a { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--line-2); color: var(--ink-2); text-decoration: none; }
+.site-foot.social a:hover { background: var(--solid); color: #fff; }
+.site-foot.social svg { width: 16px; height: 16px; fill: currentColor; }
+.site-foot.social .handle { font-size: 13px; font-weight: 700; color: var(--ink-3); }
