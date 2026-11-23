@@ -911,3 +911,10 @@ html[data-theme="dark"] .lb tbody tr:nth-child(3) { background: linear-gradient(
 .hurt-note { margin: 8px 0 0; font-size: 13px; font-weight: 600; color: #d93a3a; text-align: center; }
 html[data-theme="dark"] .hurt-note { color: #ff7a7a; }
 .matchup .quick-share .again-row { grid-column: 1 / -1; }
+
+/* big screens: scale the whole site down a notch so more fits without scrolling */
+@media (min-width: 1100px) {
+  html { zoom: .82; }
+  .wrap { max-width: 1400px; }
+  body { min-height: calc(100vh / .82); }
+}

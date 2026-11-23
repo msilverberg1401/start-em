@@ -639,7 +639,8 @@
         <div class="quick-share">
           <button class="btn yel big" id="share">Share result</button>
           <button class="btn navy big" id="challenge">Challenge a friend</button>
-          ${g.mode === "ranked" || g.mode === "casual" ? `<button class="btn ghost big again-row" id="again">Play ${g.mode} again</button>` : g.mode === "archive" || g.mode === "daily" ? `<button class="btn ghost big again-row" id="morepast">Play past Dailies</button>` : ""}
+          ${g.mode === "ranked" || g.mode === "casual" ? `<button class="btn ghost big" id="again">Play ${g.mode} again</button>` : g.mode === "archive" || g.mode === "daily" ? `<button class="btn ghost big" id="morepast">Play past Dailies</button>` : ""}
+          <button class="btn ghost big ${["ranked","casual","archive","daily"].includes(g.mode) ? "" : "again-row"}" id="back">Back to standings</button>
         </div>
       </section>
 
@@ -682,9 +683,7 @@
       ${g.mode === "daily" || g.mode === "archive" ? `<section class="panel dstats" id="dstats"><div class="ph"><h2>How everyone played Daily #${g.number}</h2><span class="aside">Loading…</span></div></section>` : ""}
       ${g.mode === "daily" ? reminderBar() : ""}
 
-      <div class="res-actions">
-        <button class="btn ghost" id="back">Back to standings</button>
-      </div>
+
     </div>`;
     wireTopbar(false);
     requestAnimationFrame(() => { const f = $("#fill"); if (f) f.style.width = `${Math.min(100, r.pct)}%`; });
