@@ -18,11 +18,13 @@
   let session = null, me = null, game = null, selected = null, lbTab = "daily", lbGroup = null, lastTotal = 0;
 
   // ---------- helpers ----------
+  // the owner's devices stay out of the stats counters, even when logged out
+  const notrack = () => { try { return localStorage.getItem("se_nt") === "1"; } catch { return false; } };
   async function api(action, extra = {}) {
     const res = await fetch(`${CFG.supabaseUrl}/functions/v1/game`, {
       method: "POST",
       headers: { "content-type": "application/json", apikey: CFG.supabaseAnonKey, authorization: `Bearer ${session?.access_token || CFG.supabaseAnonKey}` },
-      body: JSON.stringify({ action, ...extra }),
+      body: JSON.stringify({ action, ...extra, ...(notrack() ? { nt: 1 } : {}) }),
     });
     const data = await res.json().catch(() => ({ error: "The server sent back something unexpected. Try again." }));
     if (!res.ok) throw Object.assign(new Error(data.error || "Request failed."), { status: res.status });
@@ -298,7 +300,7 @@
   // then redraws when the server answers. A sleeping server can take a few seconds to wake up.
   const ME_KEY = "se_me_cache";
   const cachedMe = () => { try { const c = JSON.parse(localStorage.getItem(ME_KEY) || "null"); return c && c.uid === (session?.user?.id || null) && c.today === todayET() ? c.me : null; } catch { return null; } };
-  const saveMe = (m) => { try { localStorage.setItem(ME_KEY, JSON.stringify({ uid: session?.user?.id || null, today: todayET(), me: m })); } catch {} };
+  const saveMe = (m) => { try { if (m?.admin) localStorage.setItem("se_nt", "1"); localStorage.setItem(ME_KEY, JSON.stringify({ uid: session?.user?.id || null, today: todayET(), me: m })); } catch {} };
   const todayET = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
   let homeSeq = 0;
   async function home() {

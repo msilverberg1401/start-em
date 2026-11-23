@@ -459,7 +459,7 @@ export async function handle({ body, auth, db }) {
   if (!fn) return { status: 404, body: { error: "Unknown action." } };
   try {
     const out = await fn({ auth, db, body });
-    track(db, body.action, out);
+    if (!isAdmin(auth) && !body.nt) track(db, body.action, out); // the owner's own visits and games don't count
     return { status: 200, body: out };
   }
   catch (e) {
