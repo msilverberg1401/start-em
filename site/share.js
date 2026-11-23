@@ -18,6 +18,27 @@ window.StartEmShare = (() => {
   const round = (ctx, x, y, w, h, r, fill) => { ctx.fillStyle = fill; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill(); };
   const fit = (ctx, text, max) => { if (ctx.measureText(text).width <= max) return text; let t = text; while (t.length > 1 && ctx.measureText(t + "…").width > max) t = t.slice(0, -1); return t + "…"; };
 
+
+  // the Start 'Em logo: the name painted on a strip of field (same as the site header)
+  function fieldLogo(ctx, x, y, size) {
+    ctx.font = `italic 900 ${size}px ${DISP}`;
+    const tw = ctx.measureText("START").width, ew = ctx.measureText("'EM").width, gap = size * 0.22;
+    const padX = size * 0.45, h = size * 1.18, w = padX * 2 + tw + gap + ew, r = size * 0.2;
+    ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.clip();
+    const band = size * 0.42; for (let i = 0; i * band < w; i++) { ctx.fillStyle = i % 2 ? C.turf2 : C.turf; ctx.fillRect(x + i * band, y, band + 1, h); }
+    ctx.fillStyle = "rgba(255,255,255,.85)"; const step = size * 0.26, hw = size * 0.045, hh = size * 0.13;
+    for (let hx = x + size * 0.18; hx < x + w - size * 0.12; hx += step) { ctx.fillRect(hx, y + size * 0.09, hw, hh); ctx.fillRect(hx, y + h - size * 0.09 - hh, hw, hh); }
+    ctx.restore();
+    const lw = Math.max(2, size * 0.05); ctx.lineWidth = lw; ctx.strokeStyle = "#fff";
+    ctx.beginPath(); ctx.roundRect(x + lw / 2, y + lw / 2, w - lw, h - lw, r); ctx.stroke();
+    const by = y + h / 2 + size * 0.34; ctx.textAlign = "left";
+    for (const [t, col, dx] of [["START", "#fff", 0], ["'EM", C.yel, tw + gap]]) {
+      ctx.fillStyle = C.navy; ctx.fillText(t, x + padX + dx, by + size * 0.07);
+      ctx.fillStyle = col; ctx.fillText(t, x + padX + dx, by);
+    }
+    return { w, h };
+  }
+
   async function draw({ game, url, teamColors }) {
     await fonts();
     const r = game.result, W = 1080, H = 1350;
@@ -38,10 +59,7 @@ window.StartEmShare = (() => {
     ctx.fillStyle = C.navy; ctx.fillRect(0, 0, W, FT);
     slant(ctx, 0, FT - 8, W * 0.42, 8, 8, C.yel);
     ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
-    ctx.font = `italic 900 76px ${DISP}`; ctx.fillStyle = "#fff"; ctx.fillText("START", 60, 102);
-    const sw = ctx.measureText("START").width;
-    slant(ctx, 60 + sw + 14, 36, ctx.measureText("'EM").width + 44, 80, 14, C.yel);
-    ctx.fillStyle = C.ink; ctx.fillText("'EM", 60 + sw + 26, 102);
+    fieldLogo(ctx, 60, 30, 68);
     ctx.textAlign = "right"; ctx.fillStyle = C.steel; ctx.font = `800 40px ${DISP}`;
     ctx.fillText(game.mode === "daily" ? `DAILY #${game.number}` : game.mode === "archive" ? `PAST DAILY #${game.number}` : game.mode === "ranked" ? "RANKED" : game.mode === "challenge" ? "CHALLENGE" : "CASUAL", W - 60, 98);
 
@@ -130,9 +148,7 @@ window.StartEmShare = (() => {
 
       // logo + mode
       ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
-      ctx.font = `italic 900 104px ${DISP}`; ctx.fillStyle = "#fff"; ctx.fillText("START", 70, 170);
-      const sw = ctx.measureText("START").width, ew = ctx.measureText("'EM").width;
-      slant(ctx, 70 + sw + 16, 80, ew + 56, 112, 18, C.yel); ctx.fillStyle = C.ink; ctx.fillText("'EM", 70 + sw + 32, 170);
+      fieldLogo(ctx, 70, 66, 100);
       ctx.fillStyle = C.steel; ctx.font = `800 44px ${DISP}`; ctx.fillText(fit(ctx, modeLine, W - 140), 70, 248);
 
       // scoreboard: running total

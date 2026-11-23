@@ -43,8 +43,14 @@ h1, h2, h3, h4 { margin: 0; }
 .appbar { background: var(--navy); color: #fff; position: sticky; top: 0; z-index: 20; }
 .appbar::after { content: ""; display: block; height: 4px; background: linear-gradient(90deg, var(--yel) 0 38%, transparent 38%); }
 .appbar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 62px; }
-.wordmark { font-family: var(--display); font-weight: 900; font-style: italic; font-size: 30px; line-height: 1; text-decoration: none; color: #fff; display: flex; align-items: center; white-space: nowrap; }
-.wordmark span { background: var(--yel); color: var(--on-yel); padding: 0 12px 0 8px; margin-left: 4px; clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%); }
+/* logo: the name painted on a strip of field (concept K) */
+.wordmark { position: relative; overflow: hidden; font-family: var(--display); font-weight: 900; font-style: italic; font-size: 26px; line-height: 1; text-decoration: none; color: #fff; display: flex; align-items: center; white-space: nowrap; padding: 8px 16px 9px; border-radius: 7px; text-shadow: 0 2px 0 #0D1A2B;
+  background-color: #17603A;
+  background-image: repeating-linear-gradient(90deg, #17603A 0 14px, #1A6B41 14px 28px);
+  box-shadow: inset 0 0 0 2px #fff; }
+.wordmark::before, .wordmark::after { content: ""; position: absolute; left: 4px; right: 4px; height: 4px; background-image: repeating-linear-gradient(90deg, rgba(255,255,255,.85) 0 1.5px, transparent 1.5px 9px); pointer-events: none; }
+.wordmark::before { top: 3px; } .wordmark::after { bottom: 3px; }
+.wordmark span { position: relative; color: var(--yel); margin-left: 7px; }
 .nav { display: flex; align-items: center; gap: 8px; }
 .modetag { font-weight: 600; font-size: 14px; color: #A9B7CB; margin-right: 6px; }
 .navbtn { padding: 8px 14px; border-radius: 6px; font-weight: 600; font-size: 14.5px; color: #DFE6F0; background: rgba(255,255,255,.07); }
@@ -341,7 +347,7 @@ h1, h2, h3, h4 { margin: 0; }
 @media (max-width: 640px) {
   .hide-sm { display: none; }
   .appbar .wrap { height: 56px; }
-  .wordmark { font-size: 25px; }
+  .wordmark { font-size: 22px; padding: 7px 12px 8px; }
   .navbtn { padding: 7px 10px; font-size: 13.5px; }
   .modetag { display: none; }
   .gamehead .board { grid-template-columns: 1fr 1fr 1fr; gap: 4px 14px; padding: 10px 16px 12px; }
