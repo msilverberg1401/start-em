@@ -897,3 +897,7 @@ html[data-theme="dark"] .matchup .quick-share { background: var(--surface); }
 html[data-theme="dark"] .day.good { background: rgba(18,183,106,.22); }
 html[data-theme="dark"] .day.hot { background: var(--yel); color: #5A4A16; }
 html[data-theme="dark"] .day.hot b { color: var(--on-yel); }
+/* standings on phones: anything wider than the screen scrolls inside the panel instead of being cut off */
+#lb { overflow-x: auto; }
+.show-sm { display: none; }
+@media (max-width: 640px) { .lb .show-sm { display: block; margin-top: 5px; } .lb td.nm { line-height: 1.2; } }

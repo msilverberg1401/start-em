@@ -370,14 +370,14 @@
       }
       const head = lbTab === "daily" ? "<th class='num'>Points</th><th>Season</th><th class='num hide-sm'>Accuracy</th><th class='hide-sm'>Picks</th>"
         : lbTab === "week" ? "<th class='num'>Points</th><th class='num'>Days</th>"
-        : lbTab === "ranked" ? "<th>Tier</th><th class='num'>SR</th><th class='num hide-sm'>Games</th>"
+        : lbTab === "ranked" ? "<th class='hide-sm'>Tier</th><th class='num'>SR</th><th class='num'>Games</th>"
         : "<th class='num'>Points</th><th class='hide-sm'>Lineup</th>";
 
       el.innerHTML = `<table class="lb"><thead><tr><th>Rank</th><th>Player</th>${head}</tr></thead><tbody>${d.rows.map((r, i) => `
-        <tr><td class="rk">${i + 1}</td><td class="nm">${esc(r.username)}</td>${
+        <tr><td class="rk">${i + 1}</td><td class="nm">${esc(r.username)}${lbTab === "ranked" ? `<span class="show-sm">${tierBadge(r.tier, "sm")}</span>` : ""}</td>${
           lbTab === "daily" ? `<td class="num pts">${r.total.toFixed(1)}</td><td><span class="season-badge sm ${r.record === "14-0" ? "perfect" : ""}">${r.record}</span></td><td class="num hide-sm">${r.pct}%</td><td class="grid hide-sm">${esc(r.grid)}</td>`
           : lbTab === "week" ? `<td class="num pts">${r.total.toFixed(1)}</td><td class="num">${r.days}/7</td>`
-          : lbTab === "ranked" ? `<td>${tierBadge(r.tier, "sm")}</td><td class="num pts">${r.sr}</td><td class="num hide-sm">${r.games}</td>`
+          : lbTab === "ranked" ? `<td class="hide-sm">${tierBadge(r.tier, "sm")}</td><td class="num pts">${r.sr}</td><td class="num">${r.games}</td>`
           : `<td class="num pts">${r.total.toFixed(1)} <span class="season-badge sm ${r.record === "14-0" ? "perfect" : ""}">${r.record}</span></td><td class="hide-sm lineup-cell">${r.lineup.map((l) => `${esc(l.name)} '${String(l.season).slice(2)}`).join(", ")}</td>`
         }</tr>`).join("")}</tbody></table>
         ${lbTab === "alltime" ? `<p class="lb-note">Daily and Ranked games only, one best lineup per player. Casual, challenges and past Dailies don't count. Log in to get on the board.</p>` : ""}
