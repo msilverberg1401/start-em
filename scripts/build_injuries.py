@@ -1,7 +1,7 @@
 """Mark players who were usually good but hurt that season (adds "hurt": games missed to rolls.json).
 Usage: python3 scripts/build_injuries.py supabase/functions/game/rolls.json supabase/functions/game/rolls.json
 Data: nflverse weekly rosters (injured reserve / PUP, 2002+, filled in from 2020) and injury reports (Out/Doubtful, 2009+).
-Before 2009 there is no injury data, so it falls back to games missed by an established starter."""
+Before 2009 there is no injury data, so those seasons never get the tag."""
 import pandas as pd, json, collections, sys, os, urllib.request
 D=os.environ.get('INJ_CACHE','/tmp/nflverse-inj'); os.makedirs(D,exist_ok=True)
 U='https://github.com/nflverse/nflverse-data/releases/download/'
@@ -38,7 +38,7 @@ for r in rolls:
         missed=(16 if s<2021 else 17)-tot[(s,p['id'])]
         if s>=2020: ok = n>=4 and missed>=3
         elif s>=2009: ok = n>=1 and missed>=4
-        else: ok = missed>=6 and any(ss<s and x['g']>=10 and x['rank']<=(12 if p['pos'] in('QB','TE') else 24) for (ss,x) in by[p['id']])
+        else: ok = False  # no injury data before 2009, so no tag
         if not ok: continue
         n=missed
         full=[x for (ss,x) in by[p['id']] if ss!=s and x['g']>=10]
