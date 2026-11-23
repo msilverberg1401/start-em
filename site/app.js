@@ -285,10 +285,24 @@
   }
 
   // ================= HOME =================
+  // Home draws right away from the last copy of "me" saved on this device (for the same login),
+  // then redraws when the server answers. A sleeping server can take a few seconds to wake up.
+  const ME_KEY = "se_me_cache";
+  const cachedMe = () => { try { const c = JSON.parse(localStorage.getItem(ME_KEY) || "null"); return c && c.uid === (session?.user?.id || null) && c.today === todayET() ? c.me : null; } catch { return null; } };
+  const saveMe = (m) => { try { localStorage.setItem(ME_KEY, JSON.stringify({ uid: session?.user?.id || null, today: todayET(), me: m })); } catch {} };
+  const todayET = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+  let homeSeq = 0;
   async function home() {
     game = null; selected = null;
-    try { me = await api("me"); } catch (e) { me = { signedIn: false }; toast(e.message); }
-    if (me.signedIn && !me.username) setTimeout(usernameSheet, 50);
+    const seq = ++homeSeq, cached = cachedMe();
+    if (cached) { me = cached; renderHome(); }
+    let fresh;
+    try { fresh = await api("me"); saveMe(fresh); } catch (e) { if (!cached) { fresh = { signedIn: false }; toast(e.message); } }
+    if (seq !== homeSeq || game) return; // they moved on (started a game, etc.) while we waited
+    if (fresh) { me = fresh; renderHome(); }
+  }
+  function renderHome() {
+    if (me.signedIn && !me.username && !document.querySelector(".sheet-wrap")) setTimeout(usernameSheet, 50);
     const dailyDone = me.dailyDone, rk = me.ranked;
     app.innerHTML = `
     ${topbar()}
@@ -359,10 +373,17 @@
     if (!localStorage.getItem("se_seen_how")) howToPlay();
   }
 
+  // last standings shown per tab/group, painted instantly while fresh ones load
+  const lbCache = new Map();
   async function loadBoard() {
     const el = $("#lb"); if (!el) return;
+    const key = `${lbTab}|${lbGroup || ""}`;
+    if (lbCache.has(key)) el.innerHTML = lbCache.get(key);
+    const remember = new MutationObserver(() => { lbCache.set(key, el.innerHTML); remember.disconnect(); });
+    remember.observe(el, { childList: true });
     try {
       const d = await api("leaderboard", { board: lbTab, group: lbGroup });
+      if (`${lbTab}|${lbGroup || ""}` !== key || !document.body.contains(el)) return; // switched tabs meanwhile
       if (!d.rows.length) {
         const who = lbGroup ? "in this group" : "";
         el.innerHTML = `<div class="lb-empty">${lbTab === "daily" ? `Nobody ${who} has finished today's Daily yet. Play it and take the top spot.` : lbTab === "week" ? `Nobody ${who} has played a Daily this week yet. The week resets every Tuesday.` : lbTab === "ranked" ? `Nobody ${who} is on the ladder yet. Finish 5 Ranked placement games to show up here.` : `No lineups ${who} yet. Log in and finish a Daily or Ranked game to set the record. Casual, challenges and past Dailies don't count.`}</div>`;

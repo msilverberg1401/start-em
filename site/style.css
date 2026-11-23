@@ -156,7 +156,7 @@ h1, h2, h3, h4 { margin: 0; }
 .lb tr:last-child td { border-bottom: 0; }
 .lb td.rk { font-family: var(--display); font-weight: 900; font-style: italic; font-size: 24px; width: 60px; color: var(--ink-3); }
 .lb tr:nth-child(-n+3) td.rk { color: var(--ink); }
-.lb tr:first-child { background: linear-gradient(90deg, rgba(255,225,77,.28), transparent 60%); }
+.lb tbody tr:first-child { background: linear-gradient(90deg, rgba(255,225,77,.28), transparent 60%); }
 .lb td.nm { font-weight: 700; }
 .lb .num, .lb th.num { text-align: right; }
 .lb td.rec { font-family: var(--display); font-weight: 900; font-style: italic; font-size: 22px; }
@@ -901,3 +901,8 @@ html[data-theme="dark"] .day.hot b { color: var(--on-yel); }
 #lb { overflow-x: auto; }
 .show-sm { display: none; }
 @media (max-width: 640px) { .lb .show-sm { display: block; margin-top: 5px; } .lb td.nm { line-height: 1.2; } }
+/* podium: gold, silver, bronze fades on the top three rows */
+.lb tbody tr:nth-child(2) { background: linear-gradient(90deg, rgba(168,178,191,.38), transparent 60%); }
+.lb tbody tr:nth-child(3) { background: linear-gradient(90deg, rgba(196,128,72,.30), transparent 60%); }
+html[data-theme="dark"] .lb tbody tr:nth-child(2) { background: linear-gradient(90deg, rgba(190,200,214,.22), transparent 60%); }
+html[data-theme="dark"] .lb tbody tr:nth-child(3) { background: linear-gradient(90deg, rgba(205,127,50,.24), transparent 60%); }
