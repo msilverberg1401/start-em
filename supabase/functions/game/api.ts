@@ -70,6 +70,9 @@ async function finish(db, g, profile) {
     if (src?.status === "done") s.opponent = await summary(db, src);
   }
   if (!g.user_id || !profile) return;
+  // a past Daily played later goes on that day's standings and the calendar, marked late (no streak credit)
+  const lateDaily = g.mode === "archive" && g.play_date ? db.putDaily({ play_date: g.play_date, user_id: g.user_id, username: profile.username, total, pct, grid: s.result.grid, late: true,
+    picks: s.picks.map((p, i) => ({ i, rollKey: p.rollKey, id: p.player.id, name: p.player.name, pts: p.player.pts, slot: p.slot })) }) : null;
 
   // lifetime stats for the profile page (every mode). Reads run side by side, then writes run side by side.
   const isRanked = MODES[g.mode].ranked, uid = g.user_id;
@@ -84,7 +87,7 @@ async function finish(db, g, profile) {
   st.best_wins = Math.max(st.best_wins, s.result.record.wins);
   if (!st.best_pick || bestPick.player.pts > st.best_pick.pts) st.best_pick = { ...s.result.bestPick, mode: g.mode };
   if (s.result.biggestMiss && (!st.worst_miss || s.result.biggestMiss.lost > st.worst_miss.lost)) st.worst_miss = { ...s.result.biggestMiss, mode: g.mode };
-  const writes = [db.putStats({ user_id: uid, ...st })];
+  const writes = [db.putStats({ user_id: uid, ...st }), ...(lateDaily ? [lateDaily] : [])];
 
   if (isRanked) {
     const username = profile.username;
@@ -263,7 +266,7 @@ const actions = {
     if (!validDate(date)) fail(400, "Bad date.");
     if (!(await finishedDayGame(db, auth.id, date))) fail(403, `Finish Daily #${dailyNumber(date)} to see other lineups.`);
     const who = await db.findProfileByName(String(body.username || "").trim());
-    const g = who && (await db.findGame({ user_id: who.id, mode: "daily", play_date: date, status: "done" }));
+    const g = who && (await finishedDayGame(db, who.id, date));
     if (!g) fail(404, "Couldn't find that lineup.");
     return summary(db, g);
   },
@@ -275,7 +278,7 @@ const actions = {
     const mine = {};
     if (auth) {
       for (const g of await db.archiveGames(auth.id)) mine[g.play_date] = g.status === "done" ? { total: g.state.result.total, record: g.state.result.record, played: "archive" } : { active: true };
-      for (const d of dates) { const r = await db.getDaily(d, auth.id); if (r) mine[d] = { total: Number(r.total), record: record(Number(r.total), isAllGreen(r)), played: "daily" }; }
+      for (const d of dates) { const r = await db.getDaily(d, auth.id); if (r && !(r.late && mine[d])) mine[d] = { total: Number(r.total), record: record(Number(r.total), isAllGreen(r)), played: r.late ? "archive" : "daily" }; }
     }
     return { days: dates.map((d) => ({ date: d, number: dailyNumber(d), players: counts[d] || 0, mine: mine[d] || null, theme: publicTheme(themeFor(d)) })) };
   },
@@ -432,7 +435,7 @@ async function startArchive({ auth, db, body }) {
     const prev = await db.findGame({ user_id: auth.id, mode: "archive", play_date: date });
     if (prev) return view(prev); // resume, or show the finished result
     const daily = await db.getDaily(date, auth.id);
-    if (daily) fail(409, "You already played this one as the Daily that day.");
+    if (daily && !daily.late) fail(409, "You already played this one as the Daily that day.");
   }
   const st = newState("archive", `daily-${date}`, {}, dailyQueue(date));
   return view(await db.insertGame({ user_id: auth?.id || null, mode: "archive", play_date: date, status: "active", state: st }));
@@ -445,7 +448,7 @@ async function dailyStatsFor({ auth, db, body }) {
   let mine = null;
   if (auth) {
     const d = await db.getDaily(date, auth.id);
-    if (d) mine = { total: Number(d.total), picks: d.picks || null, source: "daily" };
+    if (d) mine = { total: Number(d.total), grid: d.grid, picks: d.picks || null, source: d.late ? "late" : "daily" };
   }
   if (!mine && body.game) {
     const g = await db.getGame(String(body.game));
@@ -479,7 +482,7 @@ async function dailyStatsFor({ auth, db, body }) {
   });
   const rarest = rolls.filter((x) => x.mine && x.minePct != null).sort((x, y) => x.minePct - y.minePct)[0] || null;
   return { date, number: dailyNumber(date), theme: publicTheme(themeFor(date)), players: rows.length + (mine.source === "archive" ? 1 : 0), beat, wins, rolls,
-    rarest: rarest ? { name: rarest.mine, pct: rarest.minePct, season: rarest.season, team: rarest.team } : null, archive: mine.source === "archive" };
+    rarest: rarest ? { name: rarest.mine, pct: rarest.minePct, season: rarest.season, team: rarest.team } : null, archive: mine.source === "archive" || mine.source === "late" };
 }
 
 async function startChallenge({ auth, db, body }) {

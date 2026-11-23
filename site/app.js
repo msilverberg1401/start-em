@@ -376,7 +376,7 @@
         </button>
       </div>
 
-      <button class="archive-bar" data-archive><b>Missed a day?</b> Play past Dailies. They're unranked, and you'll see how you'd have stacked up.</button>
+      <button class="archive-bar" data-archive><b>Missed a day?</b> Play past Dailies. Your score goes on that day's standings, marked late.</button>
 
       <section class="standings">
         <div class="panel">
@@ -459,7 +459,7 @@
         : "<th class='num'>Points</th><th class='hide-sm'>Lineup</th>";
 
       return pick + `<table class="lb"><thead><tr><th>Rank</th><th>Player</th>${head}</tr></thead><tbody>${d.rows.map((r, i) => `
-        <tr ${tab === "daily" ? `data-who="${esc(r.username)}" data-date="${d.date}" class="tap" tabindex="0"` : ""}><td class="rk">${i + 1}</td><td class="nm">${esc(r.username)}${tab === "ranked" ? `<span class="show-sm">${tierBadge(r.tier, "sm")}</span>` : ""}</td>${
+        <tr ${tab === "daily" ? `data-who="${esc(r.username)}" data-date="${d.date}" class="tap" tabindex="0"` : ""}><td class="rk">${i + 1}</td><td class="nm">${esc(r.username)}${r.late ? `<span class="late-tag" title="Played later from Past Dailies">Late</span>` : ""}${tab === "ranked" ? `<span class="show-sm">${tierBadge(r.tier, "sm")}</span>` : ""}</td>${
           tab === "daily" ? `<td class="num pts">${r.total.toFixed(1)}</td><td><span class="season-badge sm ${r.record === "14-0" ? "perfect" : ""}">${r.record}</span></td><td class="num hide-sm">${r.pct}%</td><td class="grid hide-sm">${esc(r.grid)}</td>`
           : tab === "week" ? `<td class="num pts">${r.total.toFixed(1)}</td><td class="num">${r.days}/7</td>`
           : tab === "ranked" ? `<td class="hide-sm">${tierBadge(r.tier, "sm")}</td><td class="num pts">${r.sr}</td><td class="num">${r.games}</td>`
@@ -910,7 +910,7 @@
     <div class="wrap profile">
       <section class="panel">
         <div class="ph"><h2>Past Dailies</h2><span class="aside">Unranked · no rerolls</span></div>
-        <p class="ar-lede">Every Daily you missed, same seven teams everyone else got. They don't count for the standings, but you'll see how you'd have placed that day.</p>
+        <p class="ar-lede">Every Daily you missed, same seven teams everyone else got. Your score goes on that day's standings and your calendar, marked late. Late games don't count toward your streak.</p>
         ${d.days.length ? `<div class="ar-grid">${d.days.map((x) => `
           <button class="ar-day ${x.mine && !x.mine.active ? "done" : ""}" data-day="${x.date}">
             <span class="ar-n">Daily #${x.number}</span>
@@ -1157,7 +1157,7 @@
       <div class="pgrid">
         <section class="panel">
           <div class="ph"><h2>Daily history</h2><span class="aside">Last 3 weeks</span></div>
-          <div class="cal">${days.map(([d, x]) => `<${x ? `button data-day="${d}"` : "div"} class="day ${x ? "tap " : ""}${x ? (parseInt(x.record) >= 10 ? "hot" : parseInt(x.record) >= 6 ? "good" : "played") : ""}" title="${d}${x ? `: ${x.total.toFixed(1)} PPR` : ""}"><span>${new Date(d + "T12:00:00").getDate()}</span>${x ? `<b>${Math.round(x.total)}</b>` : ""}</${x ? "button" : "div"}>`).join("")}</div>
+          <div class="cal">${days.map(([d, x]) => `<${x ? `button data-day="${d}"` : "div"} class="day ${x ? "tap " : ""}${x ? (parseInt(x.record) >= 10 ? "hot" : parseInt(x.record) >= 6 ? "good" : "played") : ""}${x?.late ? " late" : ""}" title="${d}${x ? `: ${x.total.toFixed(1)} PPR${x.late ? " (played late)" : ""}` : ""}"><span>${new Date(d + "T12:00:00").getDate()}</span>${x ? `<b>${Math.round(x.total)}</b>` : ""}</${x ? "button" : "div"}>`).join("")}</div>
           <p class="cal-note">Tap a day to see your scorecard and share it.</p>
           <div class="callouts" style="padding:0 18px 18px;margin:0">
             ${st.best_pick ? `<div class="callout good"><span>Best pick ever</span><b>${esc(st.best_pick.name)}</b>, ${Number(st.best_pick.pts).toFixed(1)} pts (${st.best_pick.season} ${esc(st.best_pick.team)})</div>` : `<div class="callout"><span>Best pick ever</span>Play a game to set one.</div>`}

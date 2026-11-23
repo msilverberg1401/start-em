@@ -33,7 +33,7 @@ export function memStore() {
     async statPeople() { return { signups: [...T.profiles.values()].map(() => ({ created_at: new Date().toISOString() })), games: [...T.games.values()].filter((g) => g.user_id).map((g) => ({ user_id: g.user_id, created_at: new Date().toISOString() })), daily: [...T.daily.values()].map((r) => ({ play_date: r.play_date })), rankedPlayers: T.ranked.size, accounts: T.profiles.size }; },
     async getStats(u) { return clone(T.stats.get(u)); },
     async putStats(r) { T.stats.set(r.user_id, clone(r)); },
-    async dailyDates(u) { return [...T.daily.values()].filter((r) => r.user_id === u).map((r) => r.play_date); },
+    async dailyDates(u) { return [...T.daily.values()].filter((r) => r.user_id === u && !r.late).map((r) => r.play_date); },
     async dailyHistory(u, n) { return [...T.daily.values()].filter((r) => r.user_id === u).sort((a, b) => b.play_date.localeCompare(a.play_date)).slice(0, n); },
     async createGroup({ name, code, owner }) { if ([...T.groups.values()].some((g) => g.code === code)) return null; const g = { id: crypto.randomUUID(), code, name, owner }; T.groups.set(g.id, g); return { id: g.id, code, name }; },
     async findGroupByCode(code) { const g = [...T.groups.values()].find((x) => x.code === code); return g ? { id: g.id, code: g.code, name: g.name } : null; },

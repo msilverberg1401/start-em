@@ -41,10 +41,10 @@ export function makeStore(sb) {
     claimGame: async (id, uid) => !!(await sb.from("games").update({ user_id: uid }).eq("id", id).is("user_id", null).select("id").maybeSingle()).data,
     updateGame: (g) => one(sb.from("games").update({ status: g.status, state: g.state, updated_at: new Date().toISOString() }).eq("id", g.id).select("id").single()),
 
-    getDaily: (date, uid) => one(sb.from("daily_results").select("total,pct,grid").eq("play_date", date).eq("user_id", uid).maybeSingle()),
+    getDaily: (date, uid) => one(sb.from("daily_results").select("total,pct,grid,picks,late").eq("play_date", date).eq("user_id", uid).maybeSingle()),
     putDaily: (row) => one(sb.from("daily_results").upsert(row)),
-    async dailyDates(uid) { return (await one(sb.from("daily_results").select("play_date").eq("user_id", uid).order("play_date", { ascending: false }).limit(400))).map((r) => r.play_date); },
-    async dailyHistory(uid, n) { return (await one(sb.from("daily_results").select("play_date,total,pct,grid").eq("user_id", uid).order("play_date", { ascending: false }).limit(n))).map((r) => num(r, "total", "pct")); },
+    async dailyDates(uid) { return (await one(sb.from("daily_results").select("play_date").eq("user_id", uid).eq("late", false).order("play_date", { ascending: false }).limit(400))).map((r) => r.play_date); },
+    async dailyHistory(uid, n) { return (await one(sb.from("daily_results").select("play_date,total,pct,grid,late").eq("user_id", uid).order("play_date", { ascending: false }).limit(n))).map((r) => num(r, "total", "pct")); },
     getRanked: (uid) => one(sb.from("ranked_stats").select("*").eq("user_id", uid).maybeSingle()),
     putRanked: (row) => one(sb.from("ranked_stats").upsert(row)),
     getBest: (uid) => one(sb.from("best_lineups").select("total").eq("user_id", uid).maybeSingle()),
@@ -70,7 +70,7 @@ export function makeStore(sb) {
     putStats: (row) => one(sb.from("user_stats").upsert(row)),
 
     async dailyTop(date, n, ids) {
-      let q = sb.from("daily_results").select("username,total,pct,grid,finished_at", { count: "exact" }).eq("play_date", date);
+      let q = sb.from("daily_results").select("username,total,pct,grid,finished_at,late", { count: "exact" }).eq("play_date", date);
       if (ids) q = q.in("user_id", ids);
       const { data, count, error } = await q.order("total", { ascending: false }).order("pct", { ascending: false }).order("finished_at").limit(n);
       if (error) throw error;
