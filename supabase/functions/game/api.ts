@@ -84,7 +84,7 @@ async function finish(db, g, profile) {
   } else {
     const prev = (await db.getRanked(g.user_id)) || { games: 0, recent: [], best: 0, sr: 1000, peak: 1000, history: [] };
     const recent = [...prev.recent.map(Number), pct].slice(-20);
-    const before = Number(prev.sr ?? 1000), delta = srChange(before, pct, prev.games), after = Math.max(0, before + delta);
+    const before = Number(prev.sr ?? 1000), delta = srChange(before, pct, prev.games, s.result.record.wins), after = Math.max(0, before + delta);
     const games = prev.games + 1, placing = games <= PLACEMENT_GAMES;
     const tb = tierFor(before), ta = tierFor(after);
     s.result.ranked = { before, after, delta, games, placement: placing ? games : null, placementTotal: PLACEMENT_GAMES,

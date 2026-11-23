@@ -217,12 +217,14 @@ export function expectedPct(sr) {
   for (let i = 1; i < pts.length; i++) if (sr <= pts[i][0]) { const [a, pa] = pts[i - 1], [b, pb] = pts[i]; return pa + ((sr - a) / (b - a)) * (pb - pa); }
 }
 export const PLACEMENT_CEILING = 1999; // placements can't put you above All-Pro
-export function srChange(sr, pct, gamesBefore) {
+// small extra SR for a big season (gains only). 14-0 needs all seven picks green, so the big bonus is earned.
+export function seasonBonus(wins) { return wins >= 14 ? 15 : wins >= 11 ? (wins - 10) * 2 : 0; }
+export function srChange(sr, pct, gamesBefore, wins = 0) {
   const placing = gamesBefore < PLACEMENT_GAMES;
   const diff = pct - expectedPct(sr);
   // gains shrink at the top of the ladder; losses don't
   const k = placing ? 16 : diff > 0 && sr >= 2000 ? 5 : 8, cap = placing ? 120 : 60;
-  let d = Math.max(-cap, Math.min(cap, Math.round(k * diff)));
+  let d = Math.max(-cap, Math.min(cap, Math.round(k * diff))) + seasonBonus(wins);
   if (placing && sr + d > PLACEMENT_CEILING) d = Math.max(0, PLACEMENT_CEILING - sr);
   return d;
 }
