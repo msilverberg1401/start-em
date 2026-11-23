@@ -212,10 +212,13 @@ export function tierFor(sr) {
 }
 // accuracy needed to hold your SR. Steep at the top: Hall of Fame (2,500) needs ~96.5% every game.
 export function expectedPct(sr) {
-  const pts = [[0, 60], [1000, 80], [1600, 88], [2000, 92.5], [2500, 96.5], [3000, 99]];
-  if (sr >= 3000) return 99;
+  // tuned by simulation (sim/tune.mjs): casual fans settle in Starter, average players reach Pro Bowl,
+  // good players All-Pro, experts hover at the MVP line, and only elite pickers reach Hall of Fame after a long run
+  const pts = [[0, 58], [850, 72.5], [1200, 80.8], [1600, 86.2], [2050, 91], [2450, 94.3], [3000, 97.5]];
+  if (sr >= 3000) return 97.5;
   for (let i = 1; i < pts.length; i++) if (sr <= pts[i][0]) { const [a, pa] = pts[i - 1], [b, pb] = pts[i]; return pa + ((sr - a) / (b - a)) * (pb - pa); }
 }
+export const START_SR = 800; // new players start mid-Starter, so most first games feel like progress
 export const PLACEMENT_CEILING = 1999; // placements can't put you above All-Pro
 // small extra SR for a big season (gains only). 14-0 needs all seven picks green, so the big bonus is earned.
 export function seasonBonus(wins) { return wins >= 14 ? 15 : wins >= 11 ? (wins - 10) * 2 : 0; }

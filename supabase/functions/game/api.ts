@@ -2,10 +2,10 @@
 // Game API. Storage + auth are injected so the same code runs on Supabase and in tests.
 import {
   SLOTS, MODES, slotAccepts, rollQueue, todayET, dailyNumber, getRoll, visible, LAUNCH, themeFor, dailyQueue, publicTheme, streaks, weekStart,
-  publicRoll, reveal, gradePick, optimalLineup, EMOJI, record, isAllGreen, rerollKey, tierFor, srChange, PLACEMENT_GAMES,
+  publicRoll, reveal, gradePick, optimalLineup, EMOJI, record, isAllGreen, rerollKey, tierFor, srChange, PLACEMENT_GAMES, START_SR,
 } from "./game.ts";
 
-const withTier = (r) => r && { ...r, sr: Number(r.sr ?? 1000), tier: tierFor(Number(r.sr ?? 1000)), peakTier: tierFor(Number(r.peak ?? r.sr ?? 1000)), placing: r.games < PLACEMENT_GAMES, placementTotal: PLACEMENT_GAMES };
+const withTier = (r) => r && { ...r, sr: Number(r.sr ?? START_SR), tier: tierFor(Number(r.sr ?? START_SR)), peakTier: tierFor(Number(r.peak ?? r.sr ?? START_SR)), placing: r.games < PLACEMENT_GAMES, placementTotal: PLACEMENT_GAMES };
 
 // the record formula stays on the server so the 14-0 cutoff can't be read from the site's code
 const recStr = (total, row = {}) => { const r = record(Number(total), isAllGreen(row)); return `${r.wins}-${r.losses}`; };
@@ -82,9 +82,9 @@ async function finish(db, g, profile) {
     await db.putDaily({ play_date: g.play_date, user_id: g.user_id, username, total, pct, grid: s.result.grid,
       picks: s.picks.map((p, i) => ({ i, rollKey: p.rollKey, id: p.player.id, name: p.player.name, pts: p.player.pts, slot: p.slot })) });
   } else {
-    const prev = (await db.getRanked(g.user_id)) || { games: 0, recent: [], best: 0, sr: 1000, peak: 1000, history: [] };
+    const prev = (await db.getRanked(g.user_id)) || { games: 0, recent: [], best: 0, sr: START_SR, peak: START_SR, history: [] };
     const recent = [...prev.recent.map(Number), pct].slice(-20);
-    const before = Number(prev.sr ?? 1000), delta = srChange(before, pct, prev.games, s.result.record.wins), after = Math.max(0, before + delta);
+    const before = Number(prev.sr ?? START_SR), delta = srChange(before, pct, prev.games, s.result.record.wins), after = Math.max(0, before + delta);
     const games = prev.games + 1, placing = games <= PLACEMENT_GAMES;
     const tb = tierFor(before), ta = tierFor(after);
     s.result.ranked = { before, after, delta, games, placement: placing ? games : null, placementTotal: PLACEMENT_GAMES,
@@ -93,7 +93,7 @@ async function finish(db, g, profile) {
     await db.putRanked({
       user_id: g.user_id, username, games, recent,
       rating: r1(recent.reduce((a, b) => a + b, 0) / recent.length), best: Math.max(Number(prev.best), total),
-      sr: after, peak: Math.max(Number(prev.peak ?? 1000), after), history: [...(prev.history || []), delta].slice(-10),
+      sr: after, peak: Math.max(Number(prev.peak ?? START_SR), after), history: [...(prev.history || []), delta].slice(-10),
     });
   }
   const best = await db.getBest(g.user_id);
@@ -276,7 +276,7 @@ const actions = {
         .sort((a, b) => b.total - a.total || b.days - a.days);
       return { board, from, to: today, players: all.length, rows: all.slice(0, 10) };
     }
-    if (board === "ranked") return { board, rows: (await db.rankedTop(10, ids)).map((x) => ({ ...x, tier: tierFor(Number(x.sr ?? 1000)) })) };
+    if (board === "ranked") return { board, rows: (await db.rankedTop(10, ids)).map((x) => ({ ...x, tier: tierFor(Number(x.sr ?? START_SR)) })) };
     if (board === "alltime") return { board, rows: (await db.bestTop(10, ids)).map((x) => ({ ...x, record: recStr(x.total, x) })) };
     fail(400, "Unknown leaderboard.");
   },
