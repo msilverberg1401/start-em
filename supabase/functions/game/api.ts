@@ -322,6 +322,7 @@ const actions = {
     const ids = await memberIds(db, auth, body.group);
     if (board === "daily") {
       const date = body.date || todayET();
+      if (!validDate(date) || date > todayET()) fail(400, "Pick a Daily that's already out.");
       const { rows, count } = await db.dailyTop(date, 10, ids);
       return { board, date, number: dailyNumber(date), players: count, rows: rows.map((x) => ({ ...x, record: recStr(x.total, x) })) };
     }

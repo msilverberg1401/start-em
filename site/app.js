@@ -15,7 +15,7 @@
   const SITE_URL = CFG.siteUrl || location.href.split(/[?#]/)[0];
 
   const sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey);
-  let session = null, me = null, game = null, selected = null, lbTab = "daily", lbGroup = null, lastTotal = 0;
+  let session = null, me = null, game = null, selected = null, lbTab = "daily", lbGroup = null, lbDate = null, lastTotal = 0;
 
   // ---------- helpers ----------
   // the owner's devices stay out of the stats counters, even when logged out
@@ -360,7 +360,7 @@
             <button class="chip add" data-groups>${me.groups?.length ? "Manage groups" : "+ Make or join a group"}</button>
           </div>
           <div class="tabs" role="tablist">
-            ${[["daily", "Today's Daily"], ["week", "This week"], ["ranked", "Ranked ladder"], ["alltime", "Highest lineups ever"]]
+            ${[["daily", "Daily"], ["week", "This week"], ["ranked", "Ranked ladder"], ["alltime", "Highest lineups ever"]]
               .map(([k, l]) => `<button role="tab" data-tab="${k}" aria-selected="${lbTab === k}">${l}</button>`).join("")}
           </div>
           <div id="lb"><div class="lb-empty">Loading the standings…</div></div>
@@ -378,7 +378,11 @@
     app.querySelectorAll("[data-groups]").forEach((b) => b.addEventListener("click", () => groupSheet()));
     app.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => start(b.dataset.mode)));
     app.querySelectorAll("[data-daycard]").forEach((b) => b.addEventListener("click", () => dayCardSheet(me.today)));
-    $("#lb")?.addEventListener("click", (e) => { const tr = e.target.closest("tr[data-who]"); if (tr) lineupSheet(tr.dataset.date, tr.dataset.who); });
+    $("#lb")?.addEventListener("click", (e) => {
+      const dp = e.target.closest("[data-lbdate]");
+      if (dp) { lbDate = dp.dataset.lbdate === me.today ? null : dp.dataset.lbdate; return loadBoard(); }
+      const tr = e.target.closest("tr[data-who]"); if (tr) lineupSheet(tr.dataset.date, tr.dataset.who);
+    });
     app.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => {
       lbTab = b.dataset.tab; app.querySelectorAll("[data-tab]").forEach((x) => x.setAttribute("aria-selected", x === b)); loadBoard();
     }));
@@ -388,26 +392,41 @@
   // last standings shown per tab/group, painted instantly while fresh ones load
   // standings: data cached per tab, shown instantly, refreshed in the background; other tabs prefetched
   const lbData = new Map(); // key -> { d, at, p }
-  const lbKey = (tab, group) => `${tab}|${group || ""}`;
-  function fetchBoard(tab, group) {
-    const k = lbKey(tab, group), c = lbData.get(k) || {};
+  const lbKey = (tab, group, date) => `${tab}|${group || ""}|${tab === "daily" ? date || "" : ""}`;
+  function fetchBoard(tab, group, date) {
+    const k = lbKey(tab, group, date), c = lbData.get(k) || {};
     if (c.p) return c.p;
-    const p = api("leaderboard", { board: tab, group }).then((d) => { lbData.set(k, { d, at: Date.now() }); return d; })
+    const p = api("leaderboard", { board: tab, group, ...(tab === "daily" && date ? { date } : {}) }).then((d) => { lbData.set(k, { d, at: Date.now() }); return d; })
       .catch((e) => { lbData.set(k, { ...c, p: null }); throw e; });
     lbData.set(k, { ...c, p });
     return p;
   }
+  // one-line stepper for the Daily standings: ‹ Daily #N · Today ›, back up to 6 days (never before #1)
+  function dayPicker(d) {
+    if (!me?.today || !me.dailyNumber || me.dailyNumber < 2) return "";
+    const back = Math.round((Date.parse(me.today) - Date.parse(d.date)) / 864e5);
+    const shift = (n) => { const dt = new Date(d.date + "T12:00:00Z"); dt.setUTCDate(dt.getUTCDate() + n); return dt.toISOString().slice(0, 10); };
+    const when = back === 0 ? "Today" : back === 1 ? "Yesterday" : new Date(d.date + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+    const older = back < 6 && d.number > 1, newer = back > 0;
+    return `<div class="daystep">
+      <button class="ds-arrow" data-lbdate="${shift(-1)}" ${older ? "" : "disabled"} aria-label="Older Daily">‹</button>
+      <div class="ds-label"><b>Daily #${d.number}</b><span>${when}</span></div>
+      <button class="ds-arrow" data-lbdate="${shift(1)}" ${newer ? "" : "disabled"} aria-label="Newer Daily">›</button>
+    </div>`;
+  }
   function boardHTML(tab, group, d) {
+      const past = tab === "daily" && d.date !== me?.today;
+      const pick = tab === "daily" ? dayPicker(d) : "";
       if (!d.rows.length) {
         const who = group ? "in this group" : "";
-        return `<div class="lb-empty">${tab === "daily" ? `Nobody ${who} has finished today's Daily yet. Play it and take the top spot.` : tab === "week" ? `Nobody ${who} has played a Daily this week yet. The week resets every Tuesday.` : tab === "ranked" ? `Nobody ${who} is on the ladder yet. Finish 5 Ranked placement games to show up here.` : `No lineups ${who} yet. Log in and finish a Daily or Ranked game to set the record. Casual, challenges and past Dailies don't count.`}</div>`;
+        return pick + `<div class="lb-empty">${tab === "daily" ? (past ? `Nobody ${who} played Daily #${d.number}.` : `Nobody ${who} has finished today's Daily yet. Play it and take the top spot.`) : tab === "week" ? `Nobody ${who} has played a Daily this week yet. The week resets every Tuesday.` : tab === "ranked" ? `Nobody ${who} is on the ladder yet. Finish 5 Ranked placement games to show up here.` : `No lineups ${who} yet. Log in and finish a Daily or Ranked game to set the record. Casual, challenges and past Dailies don't count.`}</div>`;
       }
       const head = tab === "daily" ? "<th class='num'>Points</th><th>Season</th><th class='num hide-sm'>Accuracy</th><th class='hide-sm'>Picks</th>"
         : tab === "week" ? "<th class='num'>Points</th><th class='num'>Days</th>"
         : tab === "ranked" ? "<th class='hide-sm'>Tier</th><th class='num'>SR</th><th class='num'>Games</th>"
         : "<th class='num'>Points</th><th class='hide-sm'>Lineup</th>";
 
-      return `<table class="lb"><thead><tr><th>Rank</th><th>Player</th>${head}</tr></thead><tbody>${d.rows.map((r, i) => `
+      return pick + `<table class="lb"><thead><tr><th>Rank</th><th>Player</th>${head}</tr></thead><tbody>${d.rows.map((r, i) => `
         <tr ${tab === "daily" ? `data-who="${esc(r.username)}" data-date="${d.date}" class="tap" tabindex="0"` : ""}><td class="rk">${i + 1}</td><td class="nm">${esc(r.username)}${tab === "ranked" ? `<span class="show-sm">${tierBadge(r.tier, "sm")}</span>` : ""}</td>${
           tab === "daily" ? `<td class="num pts">${r.total.toFixed(1)}</td><td><span class="season-badge sm ${r.record === "14-0" ? "perfect" : ""}">${r.record}</span></td><td class="num hide-sm">${r.pct}%</td><td class="grid hide-sm">${esc(r.grid)}</td>`
           : tab === "week" ? `<td class="num pts">${r.total.toFixed(1)}</td><td class="num">${r.days}/7</td>`
@@ -416,17 +435,17 @@
         }</tr>`).join("")}</tbody></table>
         ${tab === "alltime" ? `<p class="lb-note">Daily and Ranked games only, one best lineup per player. Casual, challenges and past Dailies don't count. Log in to get on the board.</p>` : ""}
         ${tab === "week" ? `<p class="lb-note">Every Daily from ${shortDate(d.from)} to ${shortDate(weekEnd(d.from))} added up. Play every day to climb. Resets Tuesday.</p>` : ""}
-        ${tab === "daily" ? `<p class="lb-note">${d.players} ${group ? "in this group " : ""}played Daily #${d.number}. Everyone had the same teams, so it's ranked by points. ${me?.dailyDone ? "Tap a player to see their lineup." : "Finish the Daily to see everyone's lineups."}</p>` : ""}`;
+        ${tab === "daily" ? `<p class="lb-note">${d.players} ${group ? "in this group " : ""}played Daily #${d.number}. Everyone had the same teams, so it's ranked by points. ${past ? "Tap a player to see their lineup. Missed this one? Play it in past Dailies first." : me?.dailyDone ? "Tap a player to see their lineup." : "Finish the Daily to see everyone's lineups."}</p>` : ""}`;
   }
   async function loadBoard() {
     const el = $("#lb"); if (!el) return;
-    const tab = lbTab, group = lbGroup, k = lbKey(tab, group), c = lbData.get(k);
+    const tab = lbTab, group = lbGroup, date = lbDate, k = lbKey(tab, group, date), c = lbData.get(k);
     if (c?.d) el.innerHTML = boardHTML(tab, group, c.d);
     const prefetch = () => ["daily", "week", "ranked", "alltime"].forEach((t) => { if (!lbData.get(lbKey(t, group))) fetchBoard(t, group).catch(() => {}); });
     if (c?.d && Date.now() - c.at < 30000) return prefetch();
     try {
-      const d = await fetchBoard(tab, group);
-      if (lbKey(lbTab, lbGroup) !== k || !document.body.contains(el)) return; // switched tabs meanwhile
+      const d = await fetchBoard(tab, group, date);
+      if (lbKey(lbTab, lbGroup, lbDate) !== k || !document.body.contains(el)) return; // switched tabs meanwhile
       el.innerHTML = boardHTML(tab, group, d);
       prefetch();
     } catch (e) { if (!c?.d) el.innerHTML = `<div class="lb-empty">Couldn't load the standings. ${esc(e.message)}</div>`; }
