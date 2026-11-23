@@ -5,6 +5,7 @@ export function memStore() {
   return {
     T,
     async getProfile(id) { return clone(T.profiles.get(id)); },
+    async findProfileByName(n) { return clone([...T.profiles.values()].find((p) => p.username.toLowerCase() === String(n).toLowerCase()) || null); },
     async createProfile(id, username) {
       if ([...T.profiles.values()].some((p) => p.username.toLowerCase() === username.toLowerCase())) return false;
       T.profiles.set(id, { id, username }); return true;

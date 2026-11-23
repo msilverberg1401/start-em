@@ -323,7 +323,7 @@
           <h1><span class="k">Seven random NFL teams. Seven picks.</span>Who are you <span class="hl">starting?</span></h1>
           <p>Every roll hands you a team from a random season, 1999 to 2025. Start one player, then find out what he really scored in full PPR. Build the best lineup in history.</p>
           <div class="hero-cta">
-            <button class="btn yel big" data-mode="daily" ${dailyDone ? "disabled" : ""}>${dailyDone ? `Daily done: ${dailyDone.pct}%` : me.dailyActive ? `Resume Daily #${me.dailyNumber}` : `Play Daily #${me.dailyNumber ?? ""}`}</button>
+            <button class="btn yel big" ${dailyDone ? "data-daycard" : `data-mode="daily"`}>${dailyDone ? `See your Daily #${me.dailyNumber} card` : me.dailyActive ? `Resume Daily #${me.dailyNumber}` : `Play Daily #${me.dailyNumber ?? ""}`}</button>
             <button class="btn navy big" data-how2>How to play</button>
           </div>
           ${me.signedIn && me.username ? pulse() : ""}
@@ -331,11 +331,11 @@
       </section>
 
       <div class="modes">
-        <button class="mode daily" data-mode="daily" ${dailyDone ? "disabled" : ""}>
+        <button class="mode daily" ${dailyDone ? "data-daycard" : `data-mode="daily"`}>
           <div class="ph"><h3>Daily</h3><span class="aside">${me.theme ? "Theme day" : "Once a day"}</span></div>
           ${me.theme ? `<div class="theme-tag">${esc(me.theme.name)}</div>` : ""}
           <p>${me.theme ? `${esc(me.theme.desc)} ` : ""}Same seven teams for everyone today, no rerolls. One shot. Top 10 make the board.</p>
-          <div class="foot">${dailyDone ? `<span>Played: ${dailyDone.pct}%${me.streak?.current ? ` · ${me.streak.current}-day streak` : ""}</span><span>Next in ${untilMidnightET()}</span>` : `<span>${me.dailyActive ? "In progress" : me.streak?.current ? `${me.streak.current}-day streak. Keep it going.` : `Daily #${me.dailyNumber ?? ""}`}</span><em>${me.dailyActive ? "Resume" : "Play"}</em>`}</div>
+          <div class="foot">${dailyDone ? `<span>Played: ${dailyDone.pct}%${me.streak?.current ? ` · ${me.streak.current}-day streak` : ""}</span><span>Next in ${untilMidnightET()}</span><em>Your card</em>` : `<span>${me.dailyActive ? "In progress" : me.streak?.current ? `${me.streak.current}-day streak. Keep it going.` : `Daily #${me.dailyNumber ?? ""}`}</span><em>${me.dailyActive ? "Resume" : "Play"}</em>`}</div>
         </button>
         <button class="mode ranked" data-mode="ranked">
           <div class="ph"><h3>Ranked${rk && !rk.placing ? ` <span class="ph-sr">${rk.sr} SR</span>` : ""}</h3><span class="aside">Ball knowledge</span></div>
@@ -377,6 +377,8 @@
     }));
     app.querySelectorAll("[data-groups]").forEach((b) => b.addEventListener("click", () => groupSheet()));
     app.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => start(b.dataset.mode)));
+    app.querySelectorAll("[data-daycard]").forEach((b) => b.addEventListener("click", () => dayCardSheet(me.today)));
+    $("#lb")?.addEventListener("click", (e) => { const tr = e.target.closest("tr[data-who]"); if (tr) lineupSheet(tr.dataset.date, tr.dataset.who); });
     app.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => {
       lbTab = b.dataset.tab; app.querySelectorAll("[data-tab]").forEach((x) => x.setAttribute("aria-selected", x === b)); loadBoard();
     }));
@@ -406,7 +408,7 @@
         : "<th class='num'>Points</th><th class='hide-sm'>Lineup</th>";
 
       return `<table class="lb"><thead><tr><th>Rank</th><th>Player</th>${head}</tr></thead><tbody>${d.rows.map((r, i) => `
-        <tr><td class="rk">${i + 1}</td><td class="nm">${esc(r.username)}${tab === "ranked" ? `<span class="show-sm">${tierBadge(r.tier, "sm")}</span>` : ""}</td>${
+        <tr ${tab === "daily" ? `data-who="${esc(r.username)}" data-date="${d.date}" class="tap" tabindex="0"` : ""}><td class="rk">${i + 1}</td><td class="nm">${esc(r.username)}${tab === "ranked" ? `<span class="show-sm">${tierBadge(r.tier, "sm")}</span>` : ""}</td>${
           tab === "daily" ? `<td class="num pts">${r.total.toFixed(1)}</td><td><span class="season-badge sm ${r.record === "14-0" ? "perfect" : ""}">${r.record}</span></td><td class="num hide-sm">${r.pct}%</td><td class="grid hide-sm">${esc(r.grid)}</td>`
           : tab === "week" ? `<td class="num pts">${r.total.toFixed(1)}</td><td class="num">${r.days}/7</td>`
           : tab === "ranked" ? `<td class="hide-sm">${tierBadge(r.tier, "sm")}</td><td class="num pts">${r.sr}</td><td class="num">${r.games}</td>`
@@ -414,7 +416,7 @@
         }</tr>`).join("")}</tbody></table>
         ${tab === "alltime" ? `<p class="lb-note">Daily and Ranked games only, one best lineup per player. Casual, challenges and past Dailies don't count. Log in to get on the board.</p>` : ""}
         ${tab === "week" ? `<p class="lb-note">Every Daily from ${shortDate(d.from)} to ${shortDate(weekEnd(d.from))} added up. Play every day to climb. Resets Tuesday.</p>` : ""}
-        ${tab === "daily" ? `<p class="lb-note">${d.players} ${group ? "in this group " : ""}played Daily #${d.number}. Everyone had the same teams, so it's ranked by points.</p>` : ""}`;
+        ${tab === "daily" ? `<p class="lb-note">${d.players} ${group ? "in this group " : ""}played Daily #${d.number}. Everyone had the same teams, so it's ranked by points. ${me?.dailyDone ? "Tap a player to see their lineup." : "Finish the Daily to see everyone's lineups."}</p>` : ""}`;
   }
   async function loadBoard() {
     const el = $("#lb"); if (!el) return;
@@ -756,7 +758,9 @@
     const text = StartEmShare.text({ game: g, url: shareLink });
     const card = await StartEmShare.draw({ game: g, url: CFG.shareBase || SITE_URL, teamColors: COLORS });
     // save the card online so the challenge link's preview can show it (fire and forget)
-    if (!uploaded.has(g.id)) { uploaded.add(g.id); api("uploadCard", { game: g.id, png: card.dataUrl }).catch(() => {}); }
+    // Daily lineups never go online as a link preview: a friend who hasn't played would see the answers in the chat
+    const spoiler = g.mode === "daily" || g.mode === "archive" || ["daily", "archive"].includes(g.rules?.sourceMode);
+    if (!spoiler && !uploaded.has(g.id)) { uploaded.add(g.id); api("uploadCard", { game: g.id, png: card.dataUrl }).catch(() => {}); }
     $("#shareimg").src = card.dataUrl;
     const file = new File([card.blob], `start-em-${g.mode}${g.number ? `-${g.number}` : ""}.png`, { type: "image/png" });
     const copyText = async () => {
@@ -1087,7 +1091,8 @@
       <div class="pgrid">
         <section class="panel">
           <div class="ph"><h2>Daily history</h2><span class="aside">Last 3 weeks</span></div>
-          <div class="cal">${days.map(([d, x]) => `<div class="day ${x ? (parseInt(x.record) >= 10 ? "hot" : parseInt(x.record) >= 6 ? "good" : "played") : ""}" title="${d}${x ? `: ${x.total.toFixed(1)} PPR` : ""}"><span>${new Date(d + "T12:00:00").getDate()}</span>${x ? `<b>${Math.round(x.total)}</b>` : ""}</div>`).join("")}</div>
+          <div class="cal">${days.map(([d, x]) => `<${x ? `button data-day="${d}"` : "div"} class="day ${x ? "tap " : ""}${x ? (parseInt(x.record) >= 10 ? "hot" : parseInt(x.record) >= 6 ? "good" : "played") : ""}" title="${d}${x ? `: ${x.total.toFixed(1)} PPR` : ""}"><span>${new Date(d + "T12:00:00").getDate()}</span>${x ? `<b>${Math.round(x.total)}</b>` : ""}</${x ? "button" : "div"}>`).join("")}</div>
+          <p class="cal-note">Tap a day to see your scorecard and share it.</p>
           <div class="callouts" style="padding:0 18px 18px;margin:0">
             ${st.best_pick ? `<div class="callout good"><span>Best pick ever</span><b>${esc(st.best_pick.name)}</b>, ${Number(st.best_pick.pts).toFixed(1)} pts (${st.best_pick.season} ${esc(st.best_pick.team)})</div>` : `<div class="callout"><span>Best pick ever</span>Play a game to set one.</div>`}
             ${st.worst_miss ? `<div class="callout bad"><span>Worst miss ever</span><b>${esc(st.worst_miss.name)}</b> over ${esc(st.worst_miss.instead)}, cost ${Number(st.worst_miss.lost).toFixed(1)}</div>` : `<div class="callout"><span>Worst miss ever</span>None yet.</div>`}
@@ -1120,8 +1125,48 @@
     wireTopbar(false);
     $("[data-groups]").addEventListener("click", () => groupSheet());
     $("[data-back]").addEventListener("click", home);
+    app.querySelectorAll("[data-day]").forEach((b) => b.addEventListener("click", () => dayCardSheet(b.dataset.day)));
     wireReminder();
     $("[data-out]").addEventListener("click", async () => { await sb.auth.signOut(); });
+  }
+
+  // ================= SCORECARDS (your past Dailies, and other players' lineups) =================
+  function scorecardHTML(o, title) {
+    const picks = [...o.picks].sort((a, b) => ORDER.indexOf(a.slot) - ORDER.indexOf(b.slot));
+    return `<h2 class="sheet-h">${esc(title)}</h2>
+      <p class="sc-sub">${o.mode === "archive" ? "Past " : ""}Daily #${o.number} · ${shortDate(o.date)}</p>
+      <div class="ch-card">
+        <div class="board"><div class="bulbs">${o.total.toFixed(1)}</div></div>
+        <div><span class="season-badge sm ${o.record.wins === 14 ? "perfect" : ""}">${o.record.wins}-${o.record.losses} season</span> <span class="sc-acc"><b>${o.pct}%</b> accuracy</span><div class="grid">${esc(o.grid)}</div></div>
+      </div>
+      <div class="turf lineup sc-lineup">${picks.map((l) => `<div class="slot f" style="--c:${tc(l.team)[0]}"><span class="s ${l.slot === "FLEX" ? "sm" : ""}">${SLOT_LABEL[l.slot]}</span><span class="p"><div class="nm"><span class="dot d-${l.grade}"></span>${esc(l.name)}</div><div class="meta">${l.season} ${esc(l.team)}</div></span><span class="pt">${Number(l.pts).toFixed(1)}</span></div>`).join("")}</div>`;
+  }
+
+  async function dayCardSheet(date) {
+    let o;
+    try { o = await api("dayCard", { date }); } catch (e) { return toast(e.message); }
+    const isToday = date === me?.today;
+    // text and a link only, no picture: the lineup stays off the share so it can't spoil the Daily for anyone
+    const link = (CFG.shareBase || SITE_URL).replace(/\/$/, "") + "/";
+    const text = `Start 'Em Daily #${o.number}${o.mode === "archive" ? " (played late)" : ""} 🏈\n${o.total.toFixed(1)} PPR · ${o.record.wins}-${o.record.losses} season\n${o.grid}\n${isToday ? "Can you beat it?" : "Play today's Daily:"} ${link}`;
+    const s = sheet(scorecardHTML(o, "Your scorecard") + `
+      <div class="row2 sc-actions"><button class="btn yel big" data-sshare>Share score</button><button class="btn ghost big" data-scopy>Copy text</button></div>
+      <p class="hint">Shares your score and a link, never your picks. Screenshot this card for friends who've already played.</p>`);
+    const copy = async () => { try { await navigator.clipboard.writeText(text); toast("Copied. Paste it in the group chat."); } catch { toast("Couldn't reach the clipboard in this browser."); } };
+    $("[data-scopy]", s.el).addEventListener("click", copy);
+    $("[data-sshare]", s.el).addEventListener("click", async () => {
+      try { if (navigator.share) return await navigator.share({ text, title: "Start 'Em" }); } catch (e) { if (e.name === "AbortError") return; }
+      copy();
+    });
+  }
+
+  async function lineupSheet(date, username) {
+    if (!me?.signedIn) return loginSheet("Log in and finish the Daily to see other lineups.");
+    if (date === me.today && !me.dailyDone) return toast("Finish today's Daily to see everyone's lineups. No spoilers.");
+    if (username === me.username) return dayCardSheet(date);
+    let o;
+    try { o = await api("scorecard", { date, username }); } catch (e) { return toast(e.message); }
+    sheet(scorecardHTML(o, o.username));
   }
 
   async function pendingJoin() {

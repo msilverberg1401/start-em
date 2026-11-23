@@ -19,6 +19,9 @@ export function makeStore(sb) {
       return { signups: prof.data, games: games.data, daily: daily.data, rankedPlayers: ranked.count || 0, accounts: total.count || 0 };
     },
     getProfile: (id) => one(sb.from("profiles").select("*").eq("id", id).maybeSingle()),
+    // exact username, any case (usernames are letters, numbers and _, and _ is a wildcard in ilike, so escape it)
+    findProfileByName: (name) => /^[A-Za-z0-9_]{3,16}$/.test(name)
+      ? one(sb.from("profiles").select("id,username").ilike("username", name.replace(/_/g, "\\_")).maybeSingle()) : null,
     async createProfile(id, username) {
       const { error } = await sb.from("profiles").insert({ id, username });
       if (error?.code === "23505") return false; // username taken
@@ -58,6 +61,7 @@ export function makeStore(sb) {
       if (error) throw error;
       return sb.storage.from("cards").getPublicUrl(`${id}.png`).data.publicUrl;
     },
+    removeCard: async (id) => { await sb.storage.from("cards").remove([`${id}.png`]); },
     savePush: (row) => one(sb.from("push_subscriptions").upsert(row)),
     deletePush: (endpoint) => one(sb.from("push_subscriptions").delete().eq("endpoint", endpoint)),
     getStats: (uid) => one(sb.from("user_stats").select("*").eq("user_id", uid).maybeSingle()),

@@ -13,6 +13,10 @@ const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
 let r = await call(u, { action: "uploadCard", game: g.id, png }); check("card refused before game finishes", r.status === 404, r.body.error);
 while (g.status === "active") { const open = g.slots.filter((s) => !g.picks.some((p) => p.slot === s)); for (const s of open) { const c = g.roll.players.filter((p) => ACC[s].includes(p.pos) && !p.taken); if (c.length) { g = (await call(u, { action: "pick", game: g.id, player: c[0].id, slot: s })).body; break; } } }
 r = await call(v, { action: "uploadCard", game: g.id, png }); check("someone else can't upload your card", r.status === 403, r.body.error);
+r = await call(u, { action: "uploadCard", game: g.id, png }); check("Daily card refused (would spoil the lineup)", r.status === 400, r.body.error);
+// a Casual game's card still uploads for link previews
+g = (await call(u, { action: "start", mode: "casual" })).body;
+while (g.status === "active") { const open = g.slots.filter((s) => !g.picks.some((p) => p.slot === s)); for (const s of open) { const c = g.roll.players.filter((p) => ACC[s].includes(p.pos) && !p.taken); if (c.length) { g = (await call(u, { action: "pick", game: g.id, player: c[0].id, slot: s })).body; break; } } }
 r = await call(u, { action: "uploadCard", game: g.id, png: "data:image/png;base64,aGVsbG8=" }); check("non-PNG rejected", r.status === 400, r.body.error);
 r = await call(u, { action: "uploadCard", game: g.id, png }); check("card uploads", r.status === 200 && /cards\/.+\.png/.test(r.body.url), r.body.url);
 const sub = { endpoint: "https://push.example/abc", keys: { p256dh: "k", auth: "a" } };

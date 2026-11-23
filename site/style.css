@@ -508,6 +508,22 @@ h1, h2, h3, h4 { margin: 0; }
 .day.played { background: #E3E9F2; }
 .day.good { background: #D6F3E4; }
 .day.hot { background: var(--yel); }
+button.day { border: 0; font-family: inherit; text-align: left; cursor: pointer; transition: transform .12s, box-shadow .12s; }
+button.day:hover, button.day:focus-visible { transform: translateY(-2px); box-shadow: 0 6px 14px -8px rgba(11,18,32,.5); outline: none; }
+.cal-note { margin: -8px 18px 14px; font-size: 12px; color: var(--ink-3); }
+.lb tr.tap { cursor: pointer; }
+.lb tr.tap:hover td, .lb tr.tap:focus-visible td { background: rgba(11,18,32,.04); }
+html[data-theme="dark"] .lb tr.tap:hover td { background: rgba(255,255,255,.05); }
+.sc-sub { margin: -6px 0 14px; color: var(--ink-3); font-size: 14px; font-weight: 600; }
+.sc-lineup { border-radius: 6px; padding: 10px; margin-bottom: 16px; }
+.sc-lineup .slot { margin: 0 0 5px; min-height: 46px; grid-template-columns: 54px 1fr auto; }
+.sc-lineup .slot .s { font-size: 19px; } .sc-lineup .slot .s.sm { font-size: 15px; }
+.sc-lineup .slot .p { padding: 6px 0; } .sc-lineup .slot .nm { font-size: 15px; gap: 6px; } .sc-lineup .slot .meta { font-size: 12px; }
+.sc-lineup .slot .pt { font-size: 22px; padding: 0 12px; }
+.sc-acc { white-space: nowrap; }
+.sc-lineup .slot:last-child { margin-bottom: 0; }
+.sc-actions { margin-bottom: 8px; }
+.sc-actions .btn { flex: 1; }
 .turf-total { margin: 4px 22px 0; text-align: right; font-family: var(--display); font-weight: 900; font-style: italic; font-size: 26px; }
 
 @media (max-width: 960px) {

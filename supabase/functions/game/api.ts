@@ -216,6 +216,29 @@ const actions = {
 
   dailyStats: dailyStatsFor,
 
+  // Your own finished Daily for a day (profile calendar, or "Daily done" on home), so it can be looked at and shared later.
+  async dayCard({ auth, db, body }) {
+    await needUser(auth, db);
+    const date = body.date || todayET();
+    if (!validDate(date)) fail(400, "Bad date.");
+    const g = await finishedDayGame(db, auth.id, date);
+    if (!g) fail(404, "You didn't finish that Daily.");
+    return summary(db, g);
+  },
+
+  // Someone else's Daily lineup from the standings. Only once you've finished that same Daily yourself,
+  // so nobody can open the board and read today's answers.
+  async scorecard({ auth, db, body }) {
+    await needUser(auth, db);
+    const date = body.date || todayET();
+    if (!validDate(date)) fail(400, "Bad date.");
+    if (!(await finishedDayGame(db, auth.id, date))) fail(403, `Finish Daily #${dailyNumber(date)} to see other lineups.`);
+    const who = await db.findProfileByName(String(body.username || "").trim());
+    const g = who && (await db.findGame({ user_id: who.id, mode: "daily", play_date: date, status: "done" }));
+    if (!g) fail(404, "Couldn't find that lineup.");
+    return summary(db, g);
+  },
+
   async archiveList({ auth, db }) {
     const today = todayET(), dates = [];
     for (let d = dayAdd(today, -1); d >= LAUNCH && dates.length < 60; d = dayAdd(d, -1)) dates.push(d);
@@ -233,6 +256,7 @@ const actions = {
     const g = body.game && (await db.getGame(String(body.game)));
     if (!g || g.status !== "done") fail(404, "That game isn't finished.");
     if (g.user_id && g.user_id !== auth?.id) fail(403, "That game belongs to another account.");
+    if (spoils(g)) fail(400, "Daily cards aren't used for link previews, so the lineup stays a surprise.");
     const b64 = String(body.png || "").replace(/^data:image\/png;base64,/, "");
     if (!b64 || b64.length > 2_700_000) fail(400, "Card image is missing or too big.");
     const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -255,7 +279,9 @@ const actions = {
   async challengeInfo({ db, body }) {
     const g = body.id && (await db.getGame(String(body.id)));
     if (!g || g.status !== "done") fail(404, "That challenge link doesn't work. Ask your friend to send it again.");
-    return summary(db, g);
+    // Daily cards show the lineup, so they must never be a link preview. Clear any saved before this rule existed.
+    if (spoils(g) && db.removeCard) { const p = db.removeCard(g.id).catch(() => {}); try { globalThis.EdgeRuntime?.waitUntil?.(p); } catch {} }
+    return noPicks(await summary(db, g));
   },
 
   async reroll({ auth, db, body }) {
@@ -358,6 +384,17 @@ const actions = {
 const dayAdd = (d, n) => new Date(Date.parse(d) + n * 864e5).toISOString().slice(0, 10);
 const validDate = (d) => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d);
 
+// a challenge link is opened by people who haven't played those teams yet: send the score, never the picks
+const noPicks = ({ picks, ...rest }) => rest;
+// a Daily's lineup (today's, or a past one people can still play) would spoil it if it showed in a link preview
+const spoils = (g) => g.mode === "daily" || g.mode === "archive" || g.state?.rules?.sourceMode === "daily" || g.state?.rules?.sourceMode === "archive";
+
+// a Daily this account finished, either on the day or later as a past Daily
+async function finishedDayGame(db, uid, date) {
+  const daily = await db.findGame({ user_id: uid, mode: "daily", play_date: date, status: "done" });
+  return daily || (await db.findGame({ user_id: uid, mode: "archive", play_date: date, status: "done" }));
+}
+
 async function startArchive({ auth, db, body }) {
   const date = body.date, today = todayET();
   if (!validDate(date) || date < LAUNCH || date >= today) fail(400, "That isn't a past Daily you can play.");
@@ -418,7 +455,7 @@ async function dailyStatsFor({ auth, db, body }) {
 async function startChallenge({ auth, db, body }) {
   const src = body.challenge && (await db.getGame(String(body.challenge)));
   if (!src || src.status !== "done") fail(404, "That challenge link doesn't work. Ask your friend to send it again.");
-  const opponent = await summary(db, src);
+  const opponent = noPicks(await summary(db, src)); // picks would give away the answers before they play
   // a Daily challenge from today is just today's Daily, so nobody gets a free look at it
   if (src.mode === "daily" && src.play_date === todayET()) return { redirectDaily: true, opponent };
   if (auth && src.user_id === auth.id) fail(400, "That's your own game. Send the link to a friend.");
