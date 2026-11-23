@@ -311,10 +311,27 @@
     try { fresh = await api("me"); saveMe(fresh); } catch (e) { if (!cached) { fresh = { signedIn: false }; toast(e.message); } }
     if (seq !== homeSeq || game) return; // they moved on (started a game, etc.) while we waited
     if (fresh) { me = fresh; renderHome(); }
+    if (fresh?.signedIn && fresh.username && guestDaily()) claimGuestDaily();
+  }
+  // just logged in with a Daily played as a guest today: put it on this account
+  let claiming = false;
+  async function claimGuestDaily() {
+    const gd = guestDaily(); if (!gd || claiming) return;
+    claiming = true;
+    try {
+      const g = await api("claimDaily", { game: gd.id, key: gd.key });
+      setGuestDaily(null); lbData.clear();
+      toast(g.status === "done" ? `Saved. Your ${g.result.total.toFixed(1)} is on the Daily #${g.number} standings.` : `Your Daily #${g.number} is saved to your account. Finish it to make the standings.`);
+      claiming = false; return home();
+    } catch (e) { setGuestDaily(null); toast(e.message); }
+    claiming = false;
   }
   function renderHome() {
     if (me.signedIn && !me.username && !document.querySelector(".sheet-wrap")) setTimeout(usernameSheet, 50);
     const dailyDone = me.dailyDone, rk = me.ranked;
+    const gd = !me.signedIn ? guestDaily() : null; // Daily played without an account today
+    const dailyBtn = dailyDone ? "data-daycard" : gd?.done ? "data-savescore" : `data-mode="daily"`;
+    const stats = casualStats();
     app.innerHTML = `
     ${topbar()}
     <div class="wrap">
@@ -323,7 +340,7 @@
           <h1><span class="k">Seven random NFL teams. Seven picks.</span>Who are you <span class="hl">starting?</span></h1>
           <p>Every roll hands you a team from a random season, 1999 to 2025. Start one player, then find out what he really scored in full PPR. Build the best lineup in history.</p>
           <div class="hero-cta">
-            <button class="btn yel big" ${dailyDone ? "data-daycard" : `data-mode="daily"`}>${dailyDone ? `See your Daily #${me.dailyNumber} card` : me.dailyActive ? `Resume Daily #${me.dailyNumber}` : `Play Daily #${me.dailyNumber ?? ""}`}</button>
+            <button class="btn yel big" ${dailyBtn}>${dailyDone ? `See your Daily #${me.dailyNumber} card` : gd?.done ? `Log in to save your Daily #${me.dailyNumber} score` : me.dailyActive || gd ? `Resume Daily #${me.dailyNumber}` : `Play Daily #${me.dailyNumber ?? ""}`}</button>
             <button class="btn navy big" data-how2>How to play</button>
           </div>
           ${me.signedIn && me.username ? pulse() : ""}
@@ -331,11 +348,11 @@
       </section>
 
       <div class="modes">
-        <button class="mode daily" ${dailyDone ? "data-daycard" : `data-mode="daily"`}>
+        <button class="mode daily" ${dailyBtn}>
           <div class="ph"><h3>Daily</h3><span class="aside">${me.theme ? "Theme day" : "Once a day"}</span></div>
           ${me.theme ? `<div class="theme-tag">${esc(me.theme.name)}</div>` : ""}
           <p>${me.theme ? `${esc(me.theme.desc)} ` : ""}Same seven teams for everyone today, no rerolls. One shot. Top 10 make the board.</p>
-          <div class="foot">${dailyDone ? `<span>Played: ${dailyDone.pct}%${me.streak?.current ? ` · ${me.streak.current}-day streak` : ""}</span><span>Next in ${untilMidnightET()}</span><em>Your card</em>` : `<span>${me.dailyActive ? "In progress" : me.streak?.current ? `${me.streak.current}-day streak. Keep it going.` : `Daily #${me.dailyNumber ?? ""}`}</span><em>${me.dailyActive ? "Resume" : "Play"}</em>`}</div>
+          <div class="foot">${dailyDone ? `<span>Played: ${dailyDone.pct}%${me.streak?.current ? ` · ${me.streak.current}-day streak` : ""}</span><span>Next in ${untilMidnightET()}</span><em>Your card</em>` : gd?.done ? `<span>You scored ${Number(gd.total).toFixed(1)}. Not on the board yet.</span><em>Save it</em>` : `<span>${me.dailyActive || gd ? "In progress" : me.streak?.current ? `${me.streak.current}-day streak. Keep it going.` : `Daily #${me.dailyNumber ?? ""}`}</span><em>${me.dailyActive || gd ? "Resume" : "Play"}</em>`}</div>
         </button>
         <button class="mode ranked" data-mode="ranked">
           <div class="ph"><h3>Ranked${rk && !rk.placing ? ` <span class="ph-sr">${rk.sr} SR</span>` : ""}</h3><span class="aside">Ball knowledge</span></div>
@@ -343,8 +360,8 @@
           <div class="foot"><span>${rk && !rk.placing ? tierBadge(rk.tier, "sm") : rk ? `Placement ${rk.games}/${rk.placementTotal}` : "5 placement games"}</span><em>${me.rankedActive ? "Resume" : "Play"}</em></div>
         </button>
         <button class="mode casual" data-mode="casual">
-          <div class="ph"><h3>Casual</h3><span class="aside">Stats on</span></div>
-          <p>See how much each player got the ball per game and how many games he played. One of each reroll. No login needed.</p>
+          <div class="ph"><h3>Casual</h3><span class="stat-switch" role="switch" tabindex="0" aria-checked="${stats}" aria-label="Show stats in Casual" data-stats><span class="ss-track"><span class="ss-knob"></span></span>Stats ${stats ? "on" : "off"}</span></div>
+          <p>${stats ? "See how much each player got the ball per game and how many games he played." : "No stats, just names, like the Daily. A good warm-up before the real thing."} One of each reroll. No login needed.</p>
           <div class="foot"><span>Just for fun</span><em>Play</em></div>
         </button>
       </div>
@@ -378,6 +395,11 @@
     app.querySelectorAll("[data-groups]").forEach((b) => b.addEventListener("click", () => groupSheet()));
     app.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => start(b.dataset.mode)));
     app.querySelectorAll("[data-daycard]").forEach((b) => b.addEventListener("click", () => dayCardSheet(me.today)));
+    app.querySelectorAll("[data-savescore]").forEach((b) => b.addEventListener("click", saveScoreSheet));
+    const sw = $("[data-stats]");
+    const flip = (e) => { e.stopPropagation(); e.preventDefault(); localStorage.setItem("se_stats", casualStats() ? "0" : "1"); renderHome(); };
+    sw?.addEventListener("click", flip);
+    sw?.addEventListener("keydown", (e) => { if (e.key === " " || e.key === "Enter") flip(e); });
     $("#lb")?.addEventListener("click", (e) => {
       const dp = e.target.closest("[data-lbdate]");
       if (dp) { lbDate = dp.dataset.lbdate === me.today ? null : dp.dataset.lbdate; return loadBoard(); }
@@ -452,14 +474,25 @@
   }
 
   // ================= GAME =================
+  // today's Daily played before logging in: { id, key, date, done, total }. Saved to the account after login (claimDaily).
+  const GD_KEY = "se_gd";
+  const guestDaily = () => { try { const x = JSON.parse(localStorage.getItem(GD_KEY) || "null"); return x && x.date === todayET() ? x : null; } catch { return null; } };
+  const setGuestDaily = (x) => { try { x ? localStorage.setItem(GD_KEY, JSON.stringify(x)) : localStorage.removeItem(GD_KEY); } catch {} };
+  const casualStats = () => localStorage.getItem("se_stats") !== "0";
+  const saveScoreSheet = () => loginSheet("Log in to put your Daily score on the standings. Your game is saved on this device until midnight.");
+
   async function start(mode, date) {
-    if (mode !== "casual" && mode !== "archive" && !me?.signedIn) return loginSheet(`Log in to play ${mode === "daily" ? "the Daily" : "Ranked"}. Casual works without an account.`);
-    if (mode !== "casual" && mode !== "archive" && !me.username) return usernameSheet();
+    const guestOk = mode === "casual" || mode === "archive" || mode === "daily";
+    if (!guestOk && !me?.signedIn) return loginSheet("Log in to play Ranked. The Daily and Casual work without an account.");
+    if (mode !== "casual" && mode !== "archive" && me?.signedIn && !me.username) return usernameSheet();
+    const gd = mode === "daily" && !me?.signedIn ? guestDaily() : null;
+    if (gd?.done) return saveScoreSheet();
     try {
-      game = await api("start", { mode, date });
+      game = await api("start", { mode, date, ...(mode === "casual" ? { stats: casualStats() } : {}), ...(gd ? { resume: gd.id, key: gd.key } : {}) });
+      if (game.guestKey) setGuestDaily({ id: game.id, key: game.guestKey, date: game.date, done: false });
       lastTotal = game.total; selected = null;
       renderGame(true);
-      if (game.picks.length) toast("Picking up where you left off.");
+      if (game.picks.length && game.status === "active") toast("Picking up where you left off.");
     } catch (e) { toast(e.message); }
   }
 
@@ -689,6 +722,8 @@
   async function results() {
     lbData.clear(); // a finished game can change every board
     const g = game, r = g.result;
+    const gd = g.mode === "daily" && !me?.signedIn ? guestDaily() : null;
+    if (gd && gd.id === g.id && !gd.done) setGuestDaily({ ...gd, done: true, total: r.total });
     const bySlot = (arr) => Object.fromEntries(arr.map((x) => [x.slot, x]));
     const mine = bySlot(g.picks), perf = bySlot(r.optimalLineup);
     const verdict = r.record.wins === 14 ? "Perfect season. Frame it." : r.record.wins >= 11 ? "Playoff lock." : r.record.wins >= 8 ? "Playoff bubble." : r.record.wins >= 5 ? "Consolation bracket." : "Top pick in next year's draft.";
@@ -702,6 +737,7 @@
     ${topbar(`<span class="modetag">${esc(modeName)}</span>`)}
     <div class="wrap">
       ${opp ? h2hPanel(r, opp) : ""}
+      ${gd ? `<section class="save-score"><div><b>You're not on the standings yet.</b> Log in to post ${r.total.toFixed(1)} to Daily #${g.number}. It takes 10 seconds.</div><button class="btn yel big" id="savescore">Log in to save my score</button></section>` : ""}
       <section class="panel matchup">
         <div class="mhead">
           <div class="mmain">
@@ -769,6 +805,7 @@
     if (!reduceMotion()) countUp($("#final"), 0, r.total, 5);
     $("#back").addEventListener("click", home);
     $("#again")?.addEventListener("click", () => start(g.mode));
+    $("#savescore")?.addEventListener("click", saveScoreSheet);
     $("#morepast")?.addEventListener("click", archiveView);
     wireReminder();
     setTimeout(maybeAskReminders, 2500);
@@ -982,7 +1019,7 @@
     try { o = await api("challengeInfo", { id }); } catch (e) { toast(e.message); return; }
     challengeName = o.username;
     const today = o.mode === "daily" && o.date === me?.today;
-    const rules = o.sourceMode === "ranked" ? "Ranked rules: deep rosters, one of each reroll." : o.sourceMode === "casual" ? "Casual rules: stats on, one of each reroll." : "Daily rules: no rerolls.";
+    const rules = o.sourceMode === "ranked" ? "Ranked rules: deep rosters, one of each reroll." : o.sourceMode === "casual" ? "Casual rules: one of each reroll." : "Daily rules: no rerolls.";
     const s = sheet(`
       <h2 class="sheet-h">You've been challenged</h2>
       <div class="ch-card">

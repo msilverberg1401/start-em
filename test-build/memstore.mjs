@@ -13,9 +13,10 @@ export function memStore() {
     async getGame(id) { return clone(T.games.get(id)); },
     async findGame(w) { return clone([...T.games.values()].filter((g) => Object.entries(w).every(([k, v]) => g[k] === v)).sort((a, b) => b.created_at - a.created_at)[0] || null); },
     async insertGame(g) {
-      if (g.mode === "daily" && [...T.games.values()].some((x) => x.mode === "daily" && x.user_id === g.user_id && x.play_date === g.play_date)) throw new Error("unique violation daily");
+      if (g.mode === "daily" && g.user_id && [...T.games.values()].some((x) => x.mode === "daily" && x.user_id === g.user_id && x.play_date === g.play_date)) throw new Error("unique violation daily");
       const row = { ...clone(g), id: crypto.randomUUID(), created_at: ++t }; T.games.set(row.id, row); return clone(row);
     },
+    async claimGame(id, uid) { const g = T.games.get(id); if (!g || g.user_id) return false; g.user_id = uid; return true; },
     async updateGame(g) { T.games.set(g.id, { ...T.games.get(g.id), status: g.status, state: clone(g.state) }); return clone(g); },
     async getDaily(d, u) { return clone(T.daily.get(`${d}/${u}`) || null); },
     async putDaily(r) { T.daily.set(`${r.play_date}/${r.user_id}`, { ...clone(r), finished_at: ++t }); },

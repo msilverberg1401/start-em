@@ -198,7 +198,19 @@ const actions = {
     if (!MODES[mode] || mode === "challenge" || mode === "archive") fail(400, "Pick a mode: daily, ranked or casual.");
     if (mode === "casual") {
       if (Math.random() < 0.02) db.cleanupCasual?.().catch(() => {});
-      return view(await db.insertGame({ user_id: auth?.id || null, mode, play_date: null, status: "active", state: newState(mode, `casual-${crypto.randomUUID()}`) }));
+      const st = newState(mode, `casual-${crypto.randomUUID()}`);
+      if (body.stats === false) st.rules.hints = false; // stats-off Casual: same look as the Daily, still no login
+      return view(await db.insertGame({ user_id: auth?.id || null, mode, play_date: null, status: "active", state: st }));
+    }
+    // Daily without an account: play it now, log in afterwards to put the score on the board (claimDaily).
+    // guestKey proves who started it, so a shared challenge link (same game id) can't be used to claim someone else's game.
+    if (mode === "daily" && !auth) {
+      const today = todayET();
+      const old = body.resume && (await db.getGame(String(body.resume)));
+      if (old && !old.user_id && old.mode === "daily" && old.play_date === today && body.key && old.state.guestKey === body.key) return { ...view(old), guestKey: old.state.guestKey };
+      const guestKey = crypto.randomUUID();
+      const g = await db.insertGame({ user_id: null, mode, play_date: today, status: "active", state: newState(mode, `daily-${today}`, { guestKey }, dailyQueue(today)) });
+      return { ...view(g), guestKey };
     }
     await needUser(auth, db);
     if (mode === "daily") {
@@ -215,6 +227,23 @@ const actions = {
   },
 
   dailyStats: dailyStatsFor,
+
+  // Attach today's Daily that was played before logging in to this account, so it counts for the standings,
+  // streak and stats exactly as if they'd been logged in the whole time. One Daily per account per day still holds.
+  async claimDaily({ auth, db, body }) {
+    const profile = await needUser(auth, db);
+    const g = body.game && (await db.getGame(String(body.game)));
+    if (!g || g.user_id || g.mode !== "daily" || !body.key || g.state.guestKey !== body.key) fail(404, "Couldn't find that Daily to save.");
+    if (g.play_date !== todayET()) fail(410, "That Daily is over, so it can't go on the standings now.");
+    const mine = await db.findGame({ user_id: auth.id, mode: "daily", play_date: g.play_date });
+    if (mine) fail(409, mine.status === "done" ? "This account already played today's Daily, so that score stays off the board." : "This account already started today's Daily. Finish that one.");
+    if (!(await db.claimGame(g.id, auth.id))) fail(409, "That Daily was already saved.");
+    g.user_id = auth.id;
+    delete g.state.guestKey;
+    if (g.status === "done") await finish(db, g, profile);
+    await db.updateGame(g);
+    return view(g);
+  },
 
   // Your own finished Daily for a day (profile calendar, or "Daily done" on home), so it can be looked at and shared later.
   async dayCard({ auth, db, body }) {

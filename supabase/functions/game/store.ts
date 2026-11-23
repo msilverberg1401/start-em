@@ -37,6 +37,8 @@ export function makeStore(sb) {
       return one(q.order("created_at", { ascending: false }).limit(1).maybeSingle());
     },
     insertGame: (g) => one(sb.from("games").insert(g).select().single()),
+    // give a logged-out game to an account, only if nobody owns it yet. Returns true when it worked.
+    claimGame: async (id, uid) => !!(await sb.from("games").update({ user_id: uid }).eq("id", id).is("user_id", null).select("id").maybeSingle()).data,
     updateGame: (g) => one(sb.from("games").update({ status: g.status, state: g.state, updated_at: new Date().toISOString() }).eq("id", g.id).select("id").single()),
 
     getDaily: (date, uid) => one(sb.from("daily_results").select("total,pct,grid").eq("play_date", date).eq("user_id", uid).maybeSingle()),

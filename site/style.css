@@ -510,6 +510,21 @@ h1, h2, h3, h4 { margin: 0; }
 .day.hot { background: var(--yel); }
 button.day { border: 0; font-family: inherit; text-align: left; cursor: pointer; transition: transform .12s, box-shadow .12s; }
 button.day:hover, button.day:focus-visible { transform: translateY(-2px); box-shadow: 0 6px 14px -8px rgba(11,18,32,.5); outline: none; }
+.save-score { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; padding: 14px 16px; border-radius: 8px; background: var(--solid); color: #fff; box-shadow: inset 4px 0 0 var(--yel); }
+.save-score b { color: var(--yel); }
+.save-score > div { flex: 1 1 220px; font-size: 15px; line-height: 1.4; }
+.save-score .btn { flex: 0 0 auto; }
+.stat-switch { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; color: var(--ink-2); padding: 4px 8px 4px 4px; border-radius: 999px; cursor: pointer; user-select: none; }
+.stat-switch:hover, .stat-switch:focus-visible { background: rgba(11,18,32,.06); outline: none; }
+.ss-track { position: relative; width: 34px; height: 20px; border-radius: 999px; background: #CBD3DE; transition: background .15s; }
+.ss-knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .15s; }
+.stat-switch[aria-checked="true"] .ss-track { background: var(--rb); }
+.stat-switch[aria-checked="true"] .ss-knob { transform: translateX(14px); }
+.mode .ph .stat-switch { color: rgba(255,255,255,.85); }
+.mode .ph .stat-switch:hover, .mode .ph .stat-switch:focus-visible { background: rgba(255,255,255,.1); }
+.mode .ph .ss-track { background: #4A5A72; }
+.mode .ph .stat-switch[aria-checked="true"] .ss-track { background: var(--rb); }
+html[data-theme="dark"] .ss-track { background: #3A4A61; }
 .cal-note { margin: -8px 18px 14px; font-size: 12px; color: var(--ink-3); }
 .lb tr.tap { cursor: pointer; }
 .daystep { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 16px 6px; }
