@@ -529,7 +529,7 @@
           <div class="ph"><h2>Your lineup</h2><span class="aside">${g.picks.length} of 7 filled</span></div>
           ${g.slots.map((s) => {
             const p = filled[s];
-            if (p) return `<div class="slot f ${p === g.picks[g.picks.length - 1] && !enter ? "just" : ""}" style="--c:${tc(p.team)[0]}"><span class="s ${s === "FLEX" ? "sm" : ""}">${SLOT_LABEL[s]}</span><span class="p"><div class="nm"><span class="dot d-${p.grade}"></span>${esc(p.player.name)}</div><div class="meta">${p.season} ${esc(p.teamName)} · ${p.player.pos}${p.player.rank}</div></span><span class="pt">${p.player.pts.toFixed(1)}</span></div>`;
+            if (p) return `<div class="slot f ${p === g.picks[g.picks.length - 1] && !enter ? "just" : ""}" style="--c:${tc(p.team)[0]}"><span class="s ${s === "FLEX" ? "sm" : ""}">${SLOT_LABEL[s]}</span><span class="p"><div class="nm"><span class="dot d-${p.grade}"></span>${esc(p.player.name)}${irTag(p.player)}</div><div class="meta">${p.season} ${esc(p.teamName)} · ${p.player.pos}${p.player.rank}</div></span><span class="pt">${p.player.pts.toFixed(1)}</span></div>`;
             if (targets.includes(s)) return `<button class="slot t" data-slot="${s}"><span class="s ${s === "FLEX" ? "sm" : ""}">${SLOT_LABEL[s]}</span><span class="p"><div class="nm">Start ${esc(selected.name.split(" ").slice(-1)[0])} here</div></span><span class="pt">Tap</span></button>`;
             return `<div class="slot"><span class="s ${s === "FLEX" ? "sm" : ""}">${SLOT_LABEL[s]}</span><span class="p"><div class="meta">${s === "FLEX" ? "Open · RB, WR or TE" : "Open"}</div></span><span></span></div>`;
           }).join("")}
@@ -583,14 +583,14 @@
     const ov = document.createElement("div");
     ov.className = "reveal-wrap";
     ov.innerHTML = `<div class="card" role="dialog" aria-modal="true" aria-label="${esc(pl.name)} scored ${pl.pts} points" style="--team:${t1};--team-2:${t2}">
-      <div class="card-top">${posTile(pl.pos)}<div><div class="nm">${esc(pl.name)}</div><div class="sub">${pk.season} ${esc(pk.teamName)} · ${pk.slot === "FLEX" ? `FLEX (${pl.pos})` : pl.pos}</div></div></div>
+      <div class="card-top">${posTile(pl.pos)}<div><div class="nm">${esc(pl.name)}${irTag(pl)}</div><div class="sub">${pk.season} ${esc(pk.teamName)} · ${pk.slot === "FLEX" ? `FLEX (${pl.pos})` : pl.pos}</div></div></div>
       <div class="card-pts"><div class="big" id="cardpts">0.0</div><div class="unit">PPR points</div></div>
       <div class="card-stats">
         <div><b>${pl.ppg.toFixed(1)}</b>Per game</div>
         <div><b>${pl.g}</b>Games</div>
         <div><b>${pl.pos}${pl.rank}</b>Finish</div>
       </div>
-      <div class="verdict ${pk.grade}">${verdict}</div>
+      <div class="verdict ${pk.grade}">${verdict}</div>${pl.hurt ? `<p class="hurt-note">Injured this year: missed ${pl.hurt} ${pl.hurt === 1 ? "game" : "games"}.</p>` : ""}
       <button class="btn" id="next">${game.status === "done" ? "See your season" : "Next roll"}</button>
     </div>`;
     document.body.appendChild(ov);
@@ -639,6 +639,7 @@
         <div class="quick-share">
           <button class="btn yel big" id="share">Share result</button>
           <button class="btn navy big" id="challenge">Challenge a friend</button>
+          ${g.mode === "ranked" || g.mode === "casual" ? `<button class="btn ghost big again-row" id="again">Play ${g.mode} again</button>` : g.mode === "archive" || g.mode === "daily" ? `<button class="btn ghost big again-row" id="morepast">Play past Dailies</button>` : ""}
         </div>
       </section>
 
@@ -651,11 +652,11 @@
           const a = mine[s], b = perf[s];
           const same = a.player.id === b.player.id;
           return `<div class="mrow">
-            <div class="pl"><div><div class="nm"><span class="dot d-${a.grade}"></span>${esc(a.player.name)}</div><div class="yr">${a.season} ${esc(a.team)} <b>· ${a.player.pts.toFixed(1)}</b></div></div></div>
+            <div class="pl"><div><div class="nm"><span class="dot d-${a.grade}"></span>${esc(a.player.name)}${irTag(a.player)}</div><div class="yr">${a.season} ${esc(a.team)} <b>· ${a.player.pts.toFixed(1)}</b></div></div></div>
             <span class="pt ${same ? "same" : ""}">${a.player.pts.toFixed(1)}</span>
             <span class="mid"><span class="pos p-${SLOT_LABEL[s]}">${SLOT_LABEL[s]}</span></span>
             <span class="pt r">${b.player.pts.toFixed(1)}</span>
-            <div class="pl r"><div><div class="nm">${esc(b.player.name)}</div><div class="yr">${b.season} ${esc(b.rollKey.split("-")[1])} <b>· ${b.player.pts.toFixed(1)}</b></div></div></div>
+            <div class="pl r"><div><div class="nm">${esc(b.player.name)}${irTag(b.player)}</div><div class="yr">${b.season} ${esc(b.rollKey.split("-")[1])} <b>· ${b.player.pts.toFixed(1)}</b></div></div></div>
           </div>`;
         }).join("")}
         </div>
@@ -682,7 +683,6 @@
       ${g.mode === "daily" ? reminderBar() : ""}
 
       <div class="res-actions">
-        ${g.mode === "ranked" || g.mode === "casual" ? `<button class="btn navy big" id="again">Play ${g.mode} again</button>` : g.mode === "archive" || g.mode === "daily" ? `<button class="btn navy big" id="morepast">Play past Dailies</button>` : ""}
         <button class="btn ghost" id="back">Back to standings</button>
       </div>
     </div>`;
@@ -802,6 +802,8 @@
       start("archive", x.date);
     }));
   }
+
+  const irTag = (pl) => pl && pl.hurt ? `<span class="ir" title="Injured: missed ${pl.hurt} games">IR</span>` : "";
 
   // ================= VIDEO FOR TIKTOK / REELS =================
   async function videoSheet(g, link) {
