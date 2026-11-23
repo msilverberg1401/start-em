@@ -20,11 +20,21 @@
   // ---------- helpers ----------
   // the owner's devices stay out of the stats counters, even when logged out
   const notrack = () => { try { return localStorage.getItem("se_nt") === "1"; } catch { return false; } };
+  // stats flags, so the owner page counts people instead of requests: pv = first load of the page,
+  // uv = first visit today on this device, us = first game started today on this device. No IDs are sent.
+  let pageCounted = false;
+  const firstToday = (k) => { try { const d = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date()); if (localStorage.getItem(k) === d) return false; localStorage.setItem(k, d); return true; } catch { return false; } };
+  function statFlags(action) {
+    if (notrack()) return { nt: 1 };
+    if (action === "me") { const f = {}; if (!pageCounted) { pageCounted = true; f.pv = 1; } if (firstToday("se_uv")) f.uv = 1; return f; }
+    if (action === "start") return firstToday("se_us") ? { us: 1 } : {};
+    return {};
+  }
   async function api(action, extra = {}) {
     const res = await fetch(`${CFG.supabaseUrl}/functions/v1/game`, {
       method: "POST",
       headers: { "content-type": "application/json", apikey: CFG.supabaseAnonKey, authorization: `Bearer ${session?.access_token || CFG.supabaseAnonKey}` },
-      body: JSON.stringify({ action, ...extra, ...(notrack() ? { nt: 1 } : {}) }),
+      body: JSON.stringify({ action, ...extra, ...statFlags(action) }),
     });
     const data = await res.json().catch(() => ({ error: "The server sent back something unexpected. Try again." }));
     if (!res.ok) throw Object.assign(new Error(data.error || "Request failed."), { status: res.status });
@@ -1092,8 +1102,8 @@
       <section class="panel">
         <div class="ph"><h2>Today</h2><span class="aside">${shortDate(d.today)} · Eastern time</span></div>
         <div class="st-tiles">
-          <div><b>${n(tc.visit)}</b>Visits</div>
-          <div><b>${n(opens(tc))}</b>Games opened</div>
+          <div><b>${n(tc.uvisit)}</b>Visitors</div>
+          <div><b>${pct(tc.ustart, tc.uvisit)}</b>Start rate · ${n(tc.ustart)} of ${n(tc.uvisit)}</div>
           <div><b>${n(fins(tc))}</b>Games finished</div>
           <div><b>${pct(fins(tc), tc["pick:1"])}</b>Finish rate</div>
           <div><b>${n(t.players)}</b>Logged-in players</div>
@@ -1107,7 +1117,7 @@
       <section class="panel">
         <div class="ph"><h2>Last 7 days</h2><span class="aside">${n(d.accounts)} accounts · ${n(d.rankedPlayers)} on Ranked</span></div>
         <div class="st-tiles">
-          <div><b>${n(sum((x) => x.c.visit || 0))}</b>Visits</div>
+          <div><b>${n(sum((x) => x.c.uvisit || 0))}</b>Visitors</div>
           <div><b>${n(sum((x) => fins(x.c)))}</b>Games finished</div>
           <div><b>${n(sum((x) => x.signups))}</b>New accounts</div>
           <div><b>${n(sum((x) => x.daily))}</b>Daily finishes</div>
@@ -1115,10 +1125,10 @@
       </section>
       <section class="panel">
         <div class="ph"><h2>Day by day</h2><span class="aside">Last 14 days</span></div>
-        <div class="st-wrap"><table class="lb st-table"><thead><tr><th>Day</th><th class="num">Visits</th><th class="num">Opened</th><th class="num">Finished</th><th class="num">Daily</th><th class="num">Ranked</th><th class="num">Casual</th><th class="num">Players</th><th class="num">New accts</th></tr></thead><tbody>
-          ${d.days.map((x) => `<tr><td>${shortDate(x.day)}</td><td class="num">${n(x.c.visit)}</td><td class="num">${n(opens(x.c))}</td><td class="num">${n(fins(x.c))}</td><td class="num">${n(x.daily)}</td><td class="num">${n(x.c["finish:ranked"])}</td><td class="num">${n(x.c["finish:casual"])}</td><td class="num">${n(x.players)}</td><td class="num">${n(x.signups)}</td></tr>`).join("")}
+        <div class="st-wrap"><table class="lb st-table"><thead><tr><th>Day</th><th class="num">Visitors</th><th class="num">Started</th><th class="num">Page loads</th><th class="num">Opened</th><th class="num">Finished</th><th class="num">Daily</th><th class="num">Ranked</th><th class="num">Casual</th><th class="num">Players</th><th class="num">New accts</th></tr></thead><tbody>
+          ${d.days.map((x) => `<tr><td>${shortDate(x.day)}</td><td class="num">${n(x.c.uvisit)}</td><td class="num">${n(x.c.ustart)}</td><td class="num">${n(x.c.visit)}</td><td class="num">${n(opens(x.c))}</td><td class="num">${n(fins(x.c))}</td><td class="num">${n(x.daily)}</td><td class="num">${n(x.c["finish:ranked"])}</td><td class="num">${n(x.c["finish:casual"])}</td><td class="num">${n(x.players)}</td><td class="num">${n(x.signups)}</td></tr>`).join("")}
         </tbody></table></div>
-        <p class="st-note" style="padding:0 20px 18px">Visits and game counts start from today (when tracking began). Accounts, logged-in players and Daily finishes go back further. Players = logged-in accounts that started a game; logged-out Casual players show up in Opened/Finished only.</p>
+        <p class="st-note" style="padding:0 20px 18px">Visitors = devices that opened the site that day (each counted once). Started = how many of them started a game. Page loads = every fresh load of the site. Visitors, Started and Page loads began Nov 23 in the evening (before that, "visits" counted every trip back to the home page, so they ran high). Accounts, logged-in players and Daily finishes go back further. Players = logged-in accounts that started a game; logged-out Casual players show up in Opened/Finished only.</p>
       </section>`;
   }
 

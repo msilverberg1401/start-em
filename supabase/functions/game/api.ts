@@ -509,10 +509,11 @@ async function loadOwned(db, auth, id) {
 }
 
 // owner stats counters. Fire and forget: a counter must never slow down or break a request.
-function track(db, action, out) {
+// visit = page loads (pv), uvisit = devices that came today (uv), ustart = devices that started a game today (us)
+function track(db, action, out, body = {}) {
   if (!db.bump) return;
-  const keys = action === "me" ? ["visit"]
-    : action === "start" && out?.mode ? [`open:${out.mode}`]
+  const keys = action === "me" ? [...(body.pv ? ["visit"] : []), ...(body.uv ? ["uvisit"] : [])]
+    : action === "start" && out?.mode ? [`open:${out.mode}`, ...(body.us ? ["ustart"] : [])]
     : action === "pick" && out?.picks ? [`pick:${out.picks.length}`, ...(out.status === "done" ? [`finish:${out.mode}`] : [])]
     : [];
   for (const k of keys) {
@@ -526,7 +527,7 @@ export async function handle({ body, auth, db }) {
   if (!fn) return { status: 404, body: { error: "Unknown action." } };
   try {
     const out = await fn({ auth, db, body });
-    if (!isAdmin(auth) && !body.nt) track(db, body.action, out); // the owner's own visits and games don't count
+    if (!isAdmin(auth) && !body.nt) track(db, body.action, out, body); // the owner's own visits and games don't count
     return { status: 200, body: out };
   }
   catch (e) {
