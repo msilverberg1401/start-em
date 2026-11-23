@@ -105,6 +105,7 @@
       <div class="am-head">Signed in as<b>${esc(me.username)}</b></div>
       <button role="menuitem" data-am="profile">Profile &amp; stats</button>
       <button role="menuitem" data-am="invite">Invite friends</button>
+      ${me.admin ? `<button role="menuitem" data-am="stats">📊 Game stats</button>` : ""}
       <button role="menuitem" data-am="theme">${isDark() ? "☀️ Light mode" : "🌙 Dark mode"}</button>
       <button role="menuitem" data-am="out" class="am-out">Log out</button>`;
     const r = btn.getBoundingClientRect();
@@ -117,6 +118,7 @@
     setTimeout(() => { document.addEventListener("click", outside, true); document.addEventListener("keydown", esc_); });
     m.querySelector('[data-am="profile"]').addEventListener("click", () => { close(); profileView(); });
     m.querySelector('[data-am="invite"]').addEventListener("click", () => { close(); inviteFriends(); });
+    m.querySelector('[data-am="stats"]')?.addEventListener("click", () => { close(); statsView(); });
     m.querySelector('[data-am="theme"]').addEventListener("click", () => { close(); toggleTheme(); });
     m.querySelector('[data-am="out"]').addEventListener("click", async () => { close(); await sb.auth.signOut(); });
   }
@@ -1010,6 +1012,54 @@
   }
 
   // ================= PROFILE =================
+  // ================= OWNER STATS (only shown to admin accounts) =================
+  async function statsView() {
+    game = null;
+    app.innerHTML = `${topbar(`<button class="navbtn" data-home>Back</button>`)}<div class="wrap stats-page"><section class="panel"><div class="ph"><h2>Game stats</h2><span class="aside">Loading…</span></div></section></div>`;
+    wireTopbar(false);
+    let d;
+    try { d = await api("adminStats"); } catch (e) { app.querySelector(".stats-page").innerHTML = `<section class="panel"><div class="lb-empty">${esc(e.message)}</div></section>`; return; }
+    const n = (x) => (x || 0).toLocaleString();
+    const opens = (c) => (c["open:daily"] || 0) + (c["open:ranked"] || 0) + (c["open:casual"] || 0) + (c["open:challenge"] || 0) + (c["open:archive"] || 0);
+    const fins = (c) => (c["finish:daily"] || 0) + (c["finish:ranked"] || 0) + (c["finish:casual"] || 0) + (c["finish:challenge"] || 0) + (c["finish:archive"] || 0);
+    const pct = (a, b) => (b ? `${Math.round((a / b) * 100)}%` : "–");
+    const t = d.days[0], tc = t.c;
+    const week = d.days.slice(0, 7), sum = (f) => week.reduce((a, x) => a + f(x), 0);
+    const funnel = [1, 2, 3, 4, 5, 6, 7].map((i) => tc[`pick:${i}`] || 0);
+    app.querySelector(".stats-page").innerHTML = `
+      <section class="panel">
+        <div class="ph"><h2>Today</h2><span class="aside">${shortDate(d.today)} · Eastern time</span></div>
+        <div class="st-tiles">
+          <div><b>${n(tc.visit)}</b>Visits</div>
+          <div><b>${n(opens(tc))}</b>Games opened</div>
+          <div><b>${n(fins(tc))}</b>Games finished</div>
+          <div><b>${pct(fins(tc), tc["pick:1"])}</b>Finish rate</div>
+          <div><b>${n(t.players)}</b>Logged-in players</div>
+          <div><b>${n(t.signups)}</b>New accounts</div>
+          <div><b>${n(t.daily)}</b>Daily finishers</div>
+          <div><b>${n(tc["finish:ranked"])}</b>Ranked games</div>
+        </div>
+        <div class="st-funnel"><h3>How far people got today</h3>${funnel.map((v, i) => `<div class="st-bar"><span>Pick ${i + 1}</span><i style="--w:${funnel[0] ? Math.round((v / funnel[0]) * 100) : 0}%"></i><b>${n(v)}</b></div>`).join("")}
+          <p class="st-note">Out of everyone who made a first pick. A big drop at one step means people quit there.</p></div>
+      </section>
+      <section class="panel">
+        <div class="ph"><h2>Last 7 days</h2><span class="aside">${n(d.accounts)} accounts · ${n(d.rankedPlayers)} on Ranked</span></div>
+        <div class="st-tiles">
+          <div><b>${n(sum((x) => x.c.visit || 0))}</b>Visits</div>
+          <div><b>${n(sum((x) => fins(x.c)))}</b>Games finished</div>
+          <div><b>${n(sum((x) => x.signups))}</b>New accounts</div>
+          <div><b>${n(sum((x) => x.daily))}</b>Daily finishes</div>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="ph"><h2>Day by day</h2><span class="aside">Last 14 days</span></div>
+        <div class="st-wrap"><table class="lb st-table"><thead><tr><th>Day</th><th class="num">Visits</th><th class="num">Opened</th><th class="num">Finished</th><th class="num">Daily</th><th class="num">Ranked</th><th class="num">Casual</th><th class="num">Players</th><th class="num">New accts</th></tr></thead><tbody>
+          ${d.days.map((x) => `<tr><td>${shortDate(x.day)}</td><td class="num">${n(x.c.visit)}</td><td class="num">${n(opens(x.c))}</td><td class="num">${n(fins(x.c))}</td><td class="num">${n(x.daily)}</td><td class="num">${n(x.c["finish:ranked"])}</td><td class="num">${n(x.c["finish:casual"])}</td><td class="num">${n(x.players)}</td><td class="num">${n(x.signups)}</td></tr>`).join("")}
+        </tbody></table></div>
+        <p class="st-note" style="padding:0 20px 18px">Visits and game counts start from today (when tracking began). Accounts, logged-in players and Daily finishes go back further. Players = logged-in accounts that started a game; logged-out Casual players show up in Opened/Finished only.</p>
+      </section>`;
+  }
+
   async function profileView() {
     let p;
     try { p = await api("profile"); } catch (e) { return toast(e.message); }

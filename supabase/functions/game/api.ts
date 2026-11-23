@@ -15,6 +15,10 @@ const fail = (status, msg) => { throw new HttpError(status, msg); };
 const r1 = (n) => Math.round(n * 10) / 10;
 const rulesOf = (g) => g.state.rules || { ...MODES[g.mode], rerolls: undefined };
 
+// who can see the owner stats page (login email). Override with the ADMIN_EMAILS secret, comma separated.
+const ADMINS = ((globalThis.Deno?.env?.get?.("ADMIN_EMAILS")) || "msilverberg14.ms@gmail.com").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
+const isAdmin = (auth) => !!auth?.email && ADMINS.includes(String(auth.email).toLowerCase());
+
 function view(g) {
   const s = g.state;
   const total = r1(s.picks.reduce((a, p) => a + p.player.pts, 0));
@@ -153,11 +157,28 @@ const actions = {
     const fr = friends.map((f) => ({ ...f, record: f.total == null ? null : recStr(f.total, f) }))
       .sort((a, b) => (b.total ?? -1) - (a.total ?? -1) || a.username.localeCompare(b.username));
     return {
-      signedIn: true, email: auth.email, username: profile.username, today, dailyNumber: dailyNumber(today), theme,
+      signedIn: true, email: auth.email, username: profile.username, today, dailyNumber: dailyNumber(today), theme, admin: isAdmin(auth) || undefined,
       dailyDone: dailyDone && { ...dailyDone, total: Number(dailyDone.total), record: recStr(Number(dailyDone.total), dailyDone) },
       dailyActive: !!dailyGame, ranked: withTier(ranked), rankedActive: !!rankedGame,
       streak: streaks(dates, today), groups,
       friends: { played: fr.filter((f) => f.total != null).length, total: fr.length, list: fr.slice(0, 12) },
+    };
+  },
+
+  async adminStats({ auth, db }) {
+    if (!isAdmin(auth)) fail(403, "Not available.");
+    const today = todayET(), days = [];
+    for (let i = 13; i >= 0; i--) { const d = new Date(`${today}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - i); days.push(d.toISOString().slice(0, 10)); }
+    const [counts, people] = await Promise.all([db.statCounts(days[0]), db.statPeople(`${days[0]}T00:00:00-05:00`)]);
+    const etDay = (iso) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(iso));
+    const row = Object.fromEntries(days.map((d) => [d, { day: d, c: {}, signups: 0, players: new Set(), daily: 0 }]));
+    for (const r of counts) if (row[r.day]) row[r.day].c[r.key] = Number(r.n);
+    for (const p of people.signups) { const d = etDay(p.created_at); if (row[d]) row[d].signups++; }
+    for (const g of people.games) { const d = etDay(g.created_at); if (row[d]) row[d].players.add(g.user_id); }
+    for (const x of people.daily) if (row[x.play_date]) row[x.play_date].daily++;
+    return {
+      today, accounts: people.accounts, rankedPlayers: people.rankedPlayers,
+      days: days.map((d) => ({ ...row[d], players: row[d].players.size })).reverse(),
     };
   },
 
@@ -420,10 +441,27 @@ async function loadOwned(db, auth, id) {
   return g;
 }
 
+// owner stats counters. Fire and forget: a counter must never slow down or break a request.
+function track(db, action, out) {
+  if (!db.bump) return;
+  const keys = action === "me" ? ["visit"]
+    : action === "start" && out?.mode ? [`open:${out.mode}`]
+    : action === "pick" && out?.picks ? [`pick:${out.picks.length}`, ...(out.status === "done" ? [`finish:${out.mode}`] : [])]
+    : [];
+  for (const k of keys) {
+    const p = db.bump(k).catch(() => {});
+    try { globalThis.EdgeRuntime?.waitUntil?.(p); } catch { /* not on the edge runtime */ }
+  }
+}
+
 export async function handle({ body, auth, db }) {
   const fn = actions[body?.action];
   if (!fn) return { status: 404, body: { error: "Unknown action." } };
-  try { return { status: 200, body: await fn({ auth, db, body }) }; }
+  try {
+    const out = await fn({ auth, db, body });
+    track(db, body.action, out);
+    return { status: 200, body: out };
+  }
   catch (e) {
     if (e instanceof HttpError) return { status: e.status, body: { error: e.message } };
     console.error(e);

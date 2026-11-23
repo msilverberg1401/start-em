@@ -4,6 +4,20 @@ export function makeStore(sb) {
   const one = async (q) => { const { data, error } = await q; if (error) throw error; return data; };
   const num = (r, ...keys) => { for (const k of keys) if (r[k] != null) r[k] = Number(r[k]); return r; };
   return {
+    // owner stats
+    bump: async (k) => { await sb.rpc("bump_stat", { k }); },
+    statCounts: (from) => one(sb.from("stat_counts").select("day,key,n").gte("day", from).limit(5000)),
+    async statPeople(fromISO) {
+      const [prof, games, daily, ranked] = await Promise.all([
+        sb.from("profiles").select("created_at", { count: "exact" }).gte("created_at", fromISO).limit(20000),
+        sb.from("games").select("user_id,created_at").not("user_id", "is", null).gte("created_at", fromISO).limit(50000),
+        sb.from("daily_results").select("play_date", { count: "exact" }).gte("play_date", fromISO.slice(0, 10)).limit(50000),
+        sb.from("ranked_stats").select("user_id", { count: "exact", head: true }),
+      ]);
+      const total = await sb.from("profiles").select("id", { count: "exact", head: true });
+      for (const r of [prof, games, daily, ranked, total]) if (r.error) throw r.error;
+      return { signups: prof.data, games: games.data, daily: daily.data, rankedPlayers: ranked.count || 0, accounts: total.count || 0 };
+    },
     getProfile: (id) => one(sb.from("profiles").select("*").eq("id", id).maybeSingle()),
     async createProfile(id, username) {
       const { error } = await sb.from("profiles").insert({ id, username });

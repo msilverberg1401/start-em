@@ -964,3 +964,20 @@ html[data-theme="dark"] .guide .g-x { background: var(--yel); color: #0B1220; }
 .g-card .gd { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: -1px; margin: 0 2px; }
 .g-card .gd.best { background: var(--go); } .g-card .gd.close { background: var(--close); } .g-card .gd.miss { background: var(--miss); }
 html[data-theme="dark"] .matchup .mrow .yr { color: #56667D; }
+
+/* owner stats page */
+.stats-page { padding-top: 18px; padding-bottom: 50px; display: grid; gap: 18px; }
+.st-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line-2); border-top: 1px solid var(--line-2); }
+.st-tiles div { background: var(--surface); padding: 14px 18px; font-size: 13px; font-weight: 600; color: var(--ink-3); }
+.st-tiles b { display: block; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 30px; color: var(--ink); line-height: 1.1; }
+.st-funnel { padding: 16px 20px 18px; }
+.st-funnel h3 { margin: 0 0 10px; font-size: 15px; }
+.st-bar { display: grid; grid-template-columns: 56px 1fr 48px; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; margin: 5px 0; }
+.st-bar i { display: block; height: 12px; border-radius: 3px; background: linear-gradient(90deg, var(--yel) var(--w), var(--line-2) var(--w)); }
+.st-bar b { text-align: right; }
+.st-note { font-size: 12.5px; color: var(--ink-3); margin: 10px 0 0; }
+.st-table td, .st-table th { white-space: nowrap; }
+@media (max-width: 640px) { .st-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.st-wrap { overflow-x: auto; }
+.lb.st-table tbody tr, html[data-theme="dark"] .lb.st-table tbody tr { background: none; }
+.st-funnel { max-width: 720px; }
