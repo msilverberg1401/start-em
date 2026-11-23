@@ -670,7 +670,7 @@
         <div class="share-side">
           <h3>Your card</h3>
           <p>Save it for your story, or copy the text for a group chat${g.mode === "daily" ? ". A challenge link sends friends to today's Daily" : ""}.</p>
-          ${StartEmShare.canVideo() ? `<button class="btn yel" id="makevideo"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="14" height="14" rx="2"></rect><path d="M16 10l6-3v10l-6-3z"></path></svg>Make a video for TikTok or Reels</button>` : ""}
+          ${StartEmShare.canVideo() ? `<button class="btn yel" id="makevideo"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="14" height="14" rx="2"></rect><path d="M16 10l6-3v10l-6-3z"></path></svg>Make a video</button>` : ""}
           <div class="share-more">
             <button class="btn ghost" id="copytext">Copy text</button>
             <button class="btn ghost" id="saveimg">Save image</button>
