@@ -67,42 +67,50 @@ async function finish(db, g, profile) {
   }
   if (!g.user_id || !profile) return;
 
-  // lifetime stats for the profile page (every mode)
-  const st = (await db.getStats(g.user_id)) || { games: 0, greens: 0, best_pick: null, worst_miss: null, best_wins: 0 };
+  // lifetime stats for the profile page (every mode). Reads run side by side, then writes run side by side.
+  const isRanked = MODES[g.mode].ranked, uid = g.user_id;
+  const [st0, prevRanked, best] = await Promise.all([
+    db.getStats(uid),
+    isRanked && g.mode !== "daily" ? db.getRanked(uid) : null,
+    isRanked ? db.getBest(uid) : null,
+  ]);
+  const st = st0 || { games: 0, greens: 0, best_pick: null, worst_miss: null, best_wins: 0 };
   st.games += 1;
   st.greens += s.picks.filter((p) => p.grade === "best").length;
   st.best_wins = Math.max(st.best_wins, s.result.record.wins);
   if (!st.best_pick || bestPick.player.pts > st.best_pick.pts) st.best_pick = { ...s.result.bestPick, mode: g.mode };
   if (s.result.biggestMiss && (!st.worst_miss || s.result.biggestMiss.lost > st.worst_miss.lost)) st.worst_miss = { ...s.result.biggestMiss, mode: g.mode };
-  await db.putStats({ user_id: g.user_id, ...st });
+  const writes = [db.putStats({ user_id: uid, ...st })];
 
-  if (!MODES[g.mode].ranked) return;
-  const username = profile.username;
-  if (g.mode === "daily") {
-    await db.putDaily({ play_date: g.play_date, user_id: g.user_id, username, total, pct, grid: s.result.grid,
-      picks: s.picks.map((p, i) => ({ i, rollKey: p.rollKey, id: p.player.id, name: p.player.name, pts: p.player.pts, slot: p.slot })) });
-  } else {
-    const prev = (await db.getRanked(g.user_id)) || { games: 0, recent: [], best: 0, sr: START_SR, peak: START_SR, history: [] };
-    const recent = [...prev.recent.map(Number), pct].slice(-20);
-    const before = Number(prev.sr ?? START_SR), delta = srChange(before, pct, prev.games, s.result.record.wins), after = Math.max(0, before + delta);
-    const games = prev.games + 1, placing = games <= PLACEMENT_GAMES;
-    const tb = tierFor(before), ta = tierFor(after);
-    s.result.ranked = { before, after, delta, games, placement: placing ? games : null, placementTotal: PLACEMENT_GAMES,
-      tierBefore: tb, tier: ta, moved: prev.games >= PLACEMENT_GAMES && ta.rank !== tb.rank ? (ta.rank > tb.rank ? "up" : "down") : null,
-      placed: games === PLACEMENT_GAMES };
-    await db.putRanked({
-      user_id: g.user_id, username, games, recent,
-      rating: r1(recent.reduce((a, b) => a + b, 0) / recent.length), best: Math.max(Number(prev.best), total),
-      sr: after, peak: Math.max(Number(prev.peak ?? START_SR), after), history: [...(prev.history || []), delta].slice(-10),
-    });
+  if (isRanked) {
+    const username = profile.username;
+    if (g.mode === "daily") {
+      writes.push(db.putDaily({ play_date: g.play_date, user_id: uid, username, total, pct, grid: s.result.grid,
+        picks: s.picks.map((p, i) => ({ i, rollKey: p.rollKey, id: p.player.id, name: p.player.name, pts: p.player.pts, slot: p.slot })) }));
+    } else {
+      const prev = prevRanked || { games: 0, recent: [], best: 0, sr: START_SR, peak: START_SR, history: [] };
+      const recent = [...prev.recent.map(Number), pct].slice(-20);
+      const before = Number(prev.sr ?? START_SR), delta = srChange(before, pct, prev.games, s.result.record.wins), after = Math.max(0, before + delta);
+      const games = prev.games + 1, placing = games <= PLACEMENT_GAMES;
+      const tb = tierFor(before), ta = tierFor(after);
+      s.result.ranked = { before, after, delta, games, placement: placing ? games : null, placementTotal: PLACEMENT_GAMES,
+        tierBefore: tb, tier: ta, moved: prev.games >= PLACEMENT_GAMES && ta.rank !== tb.rank ? (ta.rank > tb.rank ? "up" : "down") : null,
+        placed: games === PLACEMENT_GAMES };
+      writes.push(db.putRanked({
+        user_id: uid, username, games, recent,
+        rating: r1(recent.reduce((a, b) => a + b, 0) / recent.length), best: Math.max(Number(prev.best), total),
+        sr: after, peak: Math.max(Number(prev.peak ?? START_SR), after), history: [...(prev.history || []), delta].slice(-10),
+      }));
+    }
+    if (!best || total > Number(best.total)) {
+      writes.push(db.putBest({
+        user_id: uid, username, total, pct, mode: g.mode,
+        lineup: s.picks.map((p) => ({ slot: p.slot, name: p.player.name, season: p.season, team: p.team, pts: p.player.pts, grade: p.grade })),
+      }));
+    }
   }
-  const best = await db.getBest(g.user_id);
-  if (!best || total > Number(best.total)) {
-    await db.putBest({
-      user_id: g.user_id, username, total, pct, mode: g.mode,
-      lineup: s.picks.map((p) => ({ slot: p.slot, name: p.player.name, season: p.season, team: p.team, pts: p.player.pts, grade: p.grade })),
-    });
-  }
+  // every save must land before the game itself is marked done (the caller saves the game after this returns)
+  await Promise.all(writes);
 }
 
 // consecutive Daily days. The current streak survives until midnight if today isn't played yet.

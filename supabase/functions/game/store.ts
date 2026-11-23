@@ -20,7 +20,7 @@ export function makeStore(sb) {
       return one(q.order("created_at", { ascending: false }).limit(1).maybeSingle());
     },
     insertGame: (g) => one(sb.from("games").insert(g).select().single()),
-    updateGame: (g) => one(sb.from("games").update({ status: g.status, state: g.state, updated_at: new Date().toISOString() }).eq("id", g.id).select().single()),
+    updateGame: (g) => one(sb.from("games").update({ status: g.status, state: g.state, updated_at: new Date().toISOString() }).eq("id", g.id).select("id").single()),
 
     getDaily: (date, uid) => one(sb.from("daily_results").select("total,pct,grid").eq("play_date", date).eq("user_id", uid).maybeSingle()),
     putDaily: (row) => one(sb.from("daily_results").upsert(row)),

@@ -12,6 +12,8 @@ const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  // let browsers reuse the permission check instead of asking before every request (an extra round trip each time)
+  "Access-Control-Max-Age": "86400",
 };
 
 Deno.serve(async (req) => {
