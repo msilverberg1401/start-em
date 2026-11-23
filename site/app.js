@@ -375,37 +375,50 @@
   }
 
   // last standings shown per tab/group, painted instantly while fresh ones load
-  const lbCache = new Map();
-  async function loadBoard() {
-    const el = $("#lb"); if (!el) return;
-    const key = `${lbTab}|${lbGroup || ""}`;
-    if (lbCache.has(key)) el.innerHTML = lbCache.get(key);
-    const remember = new MutationObserver(() => { lbCache.set(key, el.innerHTML); remember.disconnect(); });
-    remember.observe(el, { childList: true });
-    try {
-      const d = await api("leaderboard", { board: lbTab, group: lbGroup });
-      if (`${lbTab}|${lbGroup || ""}` !== key || !document.body.contains(el)) return; // switched tabs meanwhile
+  // standings: data cached per tab, shown instantly, refreshed in the background; other tabs prefetched
+  const lbData = new Map(); // key -> { d, at, p }
+  const lbKey = (tab, group) => `${tab}|${group || ""}`;
+  function fetchBoard(tab, group) {
+    const k = lbKey(tab, group), c = lbData.get(k) || {};
+    if (c.p) return c.p;
+    const p = api("leaderboard", { board: tab, group }).then((d) => { lbData.set(k, { d, at: Date.now() }); return d; })
+      .catch((e) => { lbData.set(k, { ...c, p: null }); throw e; });
+    lbData.set(k, { ...c, p });
+    return p;
+  }
+  function boardHTML(tab, group, d) {
       if (!d.rows.length) {
-        const who = lbGroup ? "in this group" : "";
-        el.innerHTML = `<div class="lb-empty">${lbTab === "daily" ? `Nobody ${who} has finished today's Daily yet. Play it and take the top spot.` : lbTab === "week" ? `Nobody ${who} has played a Daily this week yet. The week resets every Tuesday.` : lbTab === "ranked" ? `Nobody ${who} is on the ladder yet. Finish 5 Ranked placement games to show up here.` : `No lineups ${who} yet. Log in and finish a Daily or Ranked game to set the record. Casual, challenges and past Dailies don't count.`}</div>`;
-        return;
+        const who = group ? "in this group" : "";
+        return `<div class="lb-empty">${tab === "daily" ? `Nobody ${who} has finished today's Daily yet. Play it and take the top spot.` : tab === "week" ? `Nobody ${who} has played a Daily this week yet. The week resets every Tuesday.` : tab === "ranked" ? `Nobody ${who} is on the ladder yet. Finish 5 Ranked placement games to show up here.` : `No lineups ${who} yet. Log in and finish a Daily or Ranked game to set the record. Casual, challenges and past Dailies don't count.`}</div>`;
       }
-      const head = lbTab === "daily" ? "<th class='num'>Points</th><th>Season</th><th class='num hide-sm'>Accuracy</th><th class='hide-sm'>Picks</th>"
-        : lbTab === "week" ? "<th class='num'>Points</th><th class='num'>Days</th>"
-        : lbTab === "ranked" ? "<th class='hide-sm'>Tier</th><th class='num'>SR</th><th class='num'>Games</th>"
+      const head = tab === "daily" ? "<th class='num'>Points</th><th>Season</th><th class='num hide-sm'>Accuracy</th><th class='hide-sm'>Picks</th>"
+        : tab === "week" ? "<th class='num'>Points</th><th class='num'>Days</th>"
+        : tab === "ranked" ? "<th class='hide-sm'>Tier</th><th class='num'>SR</th><th class='num'>Games</th>"
         : "<th class='num'>Points</th><th class='hide-sm'>Lineup</th>";
 
-      el.innerHTML = `<table class="lb"><thead><tr><th>Rank</th><th>Player</th>${head}</tr></thead><tbody>${d.rows.map((r, i) => `
-        <tr><td class="rk">${i + 1}</td><td class="nm">${esc(r.username)}${lbTab === "ranked" ? `<span class="show-sm">${tierBadge(r.tier, "sm")}</span>` : ""}</td>${
-          lbTab === "daily" ? `<td class="num pts">${r.total.toFixed(1)}</td><td><span class="season-badge sm ${r.record === "14-0" ? "perfect" : ""}">${r.record}</span></td><td class="num hide-sm">${r.pct}%</td><td class="grid hide-sm">${esc(r.grid)}</td>`
-          : lbTab === "week" ? `<td class="num pts">${r.total.toFixed(1)}</td><td class="num">${r.days}/7</td>`
-          : lbTab === "ranked" ? `<td class="hide-sm">${tierBadge(r.tier, "sm")}</td><td class="num pts">${r.sr}</td><td class="num">${r.games}</td>`
+      return `<table class="lb"><thead><tr><th>Rank</th><th>Player</th>${head}</tr></thead><tbody>${d.rows.map((r, i) => `
+        <tr><td class="rk">${i + 1}</td><td class="nm">${esc(r.username)}${tab === "ranked" ? `<span class="show-sm">${tierBadge(r.tier, "sm")}</span>` : ""}</td>${
+          tab === "daily" ? `<td class="num pts">${r.total.toFixed(1)}</td><td><span class="season-badge sm ${r.record === "14-0" ? "perfect" : ""}">${r.record}</span></td><td class="num hide-sm">${r.pct}%</td><td class="grid hide-sm">${esc(r.grid)}</td>`
+          : tab === "week" ? `<td class="num pts">${r.total.toFixed(1)}</td><td class="num">${r.days}/7</td>`
+          : tab === "ranked" ? `<td class="hide-sm">${tierBadge(r.tier, "sm")}</td><td class="num pts">${r.sr}</td><td class="num">${r.games}</td>`
           : `<td class="num pts">${r.total.toFixed(1)} <span class="season-badge sm ${r.record === "14-0" ? "perfect" : ""}">${r.record}</span></td><td class="hide-sm lineup-cell">${r.lineup.map((l) => `${esc(l.name)} '${String(l.season).slice(2)}`).join(", ")}</td>`
         }</tr>`).join("")}</tbody></table>
-        ${lbTab === "alltime" ? `<p class="lb-note">Daily and Ranked games only, one best lineup per player. Casual, challenges and past Dailies don't count. Log in to get on the board.</p>` : ""}
-        ${lbTab === "week" ? `<p class="lb-note">Every Daily from ${shortDate(d.from)} to ${shortDate(weekEnd(d.from))} added up. Play every day to climb. Resets Tuesday.</p>` : ""}
-        ${lbTab === "daily" ? `<p class="lb-note">${d.players} ${lbGroup ? "in this group " : ""}played Daily #${d.number}. Everyone had the same teams, so it's ranked by points.</p>` : ""}`;
-    } catch (e) { el.innerHTML = `<div class="lb-empty">Couldn't load the standings. ${esc(e.message)}</div>`; }
+        ${tab === "alltime" ? `<p class="lb-note">Daily and Ranked games only, one best lineup per player. Casual, challenges and past Dailies don't count. Log in to get on the board.</p>` : ""}
+        ${tab === "week" ? `<p class="lb-note">Every Daily from ${shortDate(d.from)} to ${shortDate(weekEnd(d.from))} added up. Play every day to climb. Resets Tuesday.</p>` : ""}
+        ${tab === "daily" ? `<p class="lb-note">${d.players} ${group ? "in this group " : ""}played Daily #${d.number}. Everyone had the same teams, so it's ranked by points.</p>` : ""}`;
+  }
+  async function loadBoard() {
+    const el = $("#lb"); if (!el) return;
+    const tab = lbTab, group = lbGroup, k = lbKey(tab, group), c = lbData.get(k);
+    if (c?.d) el.innerHTML = boardHTML(tab, group, c.d);
+    const prefetch = () => ["daily", "week", "ranked", "alltime"].forEach((t) => { if (!lbData.get(lbKey(t, group))) fetchBoard(t, group).catch(() => {}); });
+    if (c?.d && Date.now() - c.at < 30000) return prefetch();
+    try {
+      const d = await fetchBoard(tab, group);
+      if (lbKey(lbTab, lbGroup) !== k || !document.body.contains(el)) return; // switched tabs meanwhile
+      el.innerHTML = boardHTML(tab, group, d);
+      prefetch();
+    } catch (e) { if (!c?.d) el.innerHTML = `<div class="lb-empty">Couldn't load the standings. ${esc(e.message)}</div>`; }
   }
 
   // ================= GAME =================
@@ -567,49 +580,71 @@
   async function pick(slot) {
     const p = selected; if (!p || picking) return;
     picking = true;
+    const g = game, prev = lastTotal;
+    // open the card right away with what we already know; the points fill in when the server answers
+    const card = openReveal({ slot, season: g.roll.season, team: g.roll.team, teamName: g.roll.teamName, player: { name: p.name, pos: p.pos } });
     try {
-      const r = await api("pick", { game: game.id, player: p.id, slot });
-      const prev = lastTotal;
+      const r = await api("pick", { game: g.id, player: p.id, slot });
       game = r; selected = null;
-      showReveal(r.lastPick, prev);
-    } catch (e) { toast(e.message); }
+      card.fill(r.lastPick, prev);
+    } catch (e) { card.cancel(); toast(e.message); }
     finally { picking = false; }
   }
 
-  function showReveal(pk, prevTotal) {
+  function openReveal(pk) {
     const [t1, t2] = tc(pk.team);
     const pl = pk.player;
-    const verdict = pk.grade === "best" ? "Best start on the roll for that spot."
-      : `${esc(pk.best.name)} had ${pk.best.pts.toFixed(1)} for this spot. ${pk.grade === "close" ? "Close." : "That one hurts."}`;
     const ov = document.createElement("div");
     ov.className = "reveal-wrap";
-    ov.innerHTML = `<div class="card" role="dialog" aria-modal="true" aria-label="${esc(pl.name)} scored ${pl.pts} points" style="--team:${t1};--team-2:${t2}">
-      <div class="card-top">${posTile(pl.pos)}<div><div class="nm">${esc(pl.name)}${irTag(pl)}</div><div class="sub">${pk.season} ${esc(pk.teamName)} · ${pk.slot === "FLEX" ? `FLEX (${pl.pos})` : pl.pos}</div></div></div>
-      <div class="card-pts"><div class="big" id="cardpts">0.0</div><div class="unit">PPR points</div></div>
+    ov.innerHTML = `<div class="card" role="dialog" aria-modal="true" aria-label="${esc(pl.name)}" style="--team:${t1};--team-2:${t2}">
+      <div class="card-top">${posTile(pl.pos)}<div><div class="nm">${esc(pl.name)}<span data-ir></span></div><div class="sub">${pk.season} ${esc(pk.teamName)} · ${pk.slot === "FLEX" ? `FLEX (${pl.pos})` : pl.pos}</div></div></div>
+      <div class="card-pts"><div class="big pending" id="cardpts">0.0</div><div class="unit">PPR points</div></div>
       <div class="card-stats">
-        <div><b>${pl.ppg.toFixed(1)}</b>Per game</div>
-        <div><b>${pl.g}</b>Games</div>
-        <div><b>${pl.pos}${pl.rank}</b>Finish</div>
+        <div><b data-ppg>–</b>Per game</div>
+        <div><b data-g>–</b>Games</div>
+        <div><b data-fin>–</b>Finish</div>
       </div>
-      <div class="verdict ${pk.grade}">${verdict}</div>${pl.hurt ? `<p class="hurt-note">Injured this year: missed ${pl.hurt} ${pl.hurt === 1 ? "game" : "games"}.</p>` : ""}
-      <button class="btn" id="next">${game.status === "done" ? "See your season" : "Next roll"}</button>
+      <div class="verdict pending" data-verdict>&nbsp;</div><div data-hurt></div>
+      <button class="btn" id="next" disabled>Next roll</button>
     </div>`;
     document.body.appendChild(ov);
-    const big = $("#cardpts", ov), t0 = performance.now();
-    (function tick(t) { const k = reduceMotion() ? 1 : Math.min(1, (t - t0) / 800); big.textContent = (pl.pts * (1 - Math.pow(1 - k, 3))).toFixed(1); if (k < 1) requestAnimationFrame(tick); })(t0);
+    const big = $("#cardpts", ov);
+    let prevTotal = 0, ready = false;
     const go = () => {
+      if (!ready) return;
       ov.remove(); document.removeEventListener("keydown", key);
       renderGame(true);
       const el = $("#total"); if (el) countUp(el, prevTotal, game.total);
       lastTotal = game.total;
     };
     const key = (e) => { if (e.key === "Enter" || e.key === "Escape") go(); };
-    $("#next", ov).addEventListener("click", go); $("#next", ov).focus();
+    $("#next", ov).addEventListener("click", go);
     document.addEventListener("keydown", key);
+    return {
+      cancel() { ov.remove(); document.removeEventListener("keydown", key); },
+      fill(pk, prev) {
+        const pl = pk.player; prevTotal = prev; ready = true;
+        $(".card", ov).setAttribute("aria-label", `${pl.name} scored ${pl.pts} points`);
+        $("[data-ir]", ov).outerHTML = irTag(pl);
+        $("[data-ppg]", ov).textContent = pl.ppg.toFixed(1);
+        $("[data-g]", ov).textContent = pl.g;
+        $("[data-fin]", ov).textContent = `${pl.pos}${pl.rank}`;
+        const v = $("[data-verdict]", ov);
+        v.className = `verdict ${pk.grade}`;
+        v.innerHTML = pk.grade === "best" ? "Best start on the roll for that spot."
+          : `${esc(pk.best.name)} had ${pk.best.pts.toFixed(1)} for this spot. ${pk.grade === "close" ? "Close." : "That one hurts."}`;
+        if (pl.hurt) $("[data-hurt]", ov).outerHTML = `<p class="hurt-note">Injured this year: missed ${pl.hurt} ${pl.hurt === 1 ? "game" : "games"}.</p>`;
+        const nx = $("#next", ov); nx.disabled = false; nx.textContent = game.status === "done" ? "See your season" : "Next roll"; nx.focus();
+        big.classList.remove("pending");
+        const t0 = performance.now();
+        (function tick(t) { const k = reduceMotion() ? 1 : Math.min(1, (t - t0) / 800); big.textContent = (pl.pts * (1 - Math.pow(1 - k, 3))).toFixed(1); if (k < 1) requestAnimationFrame(tick); })(t0);
+      },
+    };
   }
 
   // ================= RESULTS: matchup =================
   async function results() {
+    lbData.clear(); // a finished game can change every board
     const g = game, r = g.result;
     const bySlot = (arr) => Object.fromEntries(arr.map((x) => [x.slot, x]));
     const mine = bySlot(g.picks), perf = bySlot(r.optimalLineup);

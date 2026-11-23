@@ -927,3 +927,8 @@ html[data-theme="dark"] .hurt-note { color: #ff7a7a; }
 @media (min-width: 1100px) {
   .play > .lineup { max-height: calc(100vh / .82 - 32px); }
 }
+/* reveal card while the server answers: points pulse, verdict is a quiet placeholder */
+.card-pts .big.pending { animation: ptsPulse .8s ease-in-out infinite; opacity: .35; }
+@keyframes ptsPulse { 50% { opacity: .12; } }
+.verdict.pending { background: var(--line-2); min-height: 22px; }
+.card #next:disabled { opacity: .5; cursor: default; }
