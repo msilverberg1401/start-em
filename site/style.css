@@ -963,3 +963,4 @@ html[data-theme="dark"] .guide .g-x { background: var(--yel); color: #0B1220; }
 .g-card { margin: 10px 18px 0; font-size: 13.5px; color: var(--ink-2); text-align: center; line-height: 1.5; }
 .g-card .gd { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: -1px; margin: 0 2px; }
 .g-card .gd.best { background: var(--go); } .g-card .gd.close { background: var(--close); } .g-card .gd.miss { background: var(--miss); }
+html[data-theme="dark"] .matchup .mrow .yr { color: #56667D; }
