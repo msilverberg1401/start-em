@@ -314,6 +314,7 @@
   const todayET = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
   let homeSeq = 0;
   async function home() {
+    stopLive();
     game = null; selected = null;
     const seq = ++homeSeq, cached = cachedMe();
     if (cached) { me = cached; renderHome(); }
@@ -322,6 +323,9 @@
     if (seq !== homeSeq || game) return; // they moved on (started a game, etc.) while we waited
     if (fresh) { me = fresh; renderHome(); }
     if (fresh?.signedIn && fresh.username && guestDaily()) claimGuestDaily();
+    // logged in from a live match invite: go back to it
+    let lp = null; try { lp = localStorage.getItem("se_live_pending"); } catch {}
+    if (lp && fresh?.signedIn && fresh.username) { try { localStorage.removeItem("se_live_pending"); } catch {} return liveIntro(lp); }
   }
   // just logged in with a Daily played as a guest today: put it on this account
   let claiming = false;
@@ -376,6 +380,7 @@
         </button>
       </div>
 
+      <button class="archive-bar live-bar" data-livenew><b>⚡ Live 1v1</b> Play a friend in real time. Same seven teams, 30 seconds a pick, picks revealed together.</button>
       <button class="archive-bar" data-archive><b>Missed a day?</b> Play past Dailies. Your score goes on that day's standings, marked late.</button>
 
       <section class="standings">
@@ -398,6 +403,7 @@
     wireTopbar(false);
     $("[data-how2]")?.addEventListener("click", howToPlay);
     $("[data-archive]")?.addEventListener("click", archiveView);
+    $("[data-livenew]")?.addEventListener("click", liveNew);
     if (lbGroup && !(me.groups || []).some((x) => x.id === lbGroup)) lbGroup = null;
     app.querySelectorAll("[data-scope]").forEach((b) => b.addEventListener("click", () => {
       lbGroup = b.dataset.scope || null; app.querySelectorAll("[data-scope]").forEach((x) => x.setAttribute("aria-pressed", x === b)); loadBoard();
@@ -1094,7 +1100,7 @@
     let d;
     try { d = await api("adminStats"); } catch (e) { app.querySelector(".stats-page").innerHTML = `<section class="panel"><div class="lb-empty">${esc(e.message)}</div></section>`; return; }
     const n = (x) => (x || 0).toLocaleString();
-    const opens = (c) => (c["open:daily"] || 0) + (c["open:ranked"] || 0) + (c["open:casual"] || 0) + (c["open:challenge"] || 0) + (c["open:archive"] || 0);
+    const opens = (c) => (c["open:daily"] || 0) + (c["open:ranked"] || 0) + (c["open:casual"] || 0) + (c["open:challenge"] || 0) + (c["open:archive"] || 0) + (c["open:live"] || 0);
     const fins = (c) => (c["finish:daily"] || 0) + (c["finish:ranked"] || 0) + (c["finish:casual"] || 0) + (c["finish:challenge"] || 0) + (c["finish:archive"] || 0);
     const pct = (a, b) => (b ? `${Math.round((a / b) * 100)}%` : "–");
     const t = d.days[0], tc = t.c;
@@ -1112,6 +1118,8 @@
           <div><b>${n(t.signups)}</b>New accounts</div>
           <div><b>${n(t.daily)}</b>Daily finishers</div>
           <div><b>${n(tc["finish:ranked"])}</b>Ranked games</div>
+          <div><b>${n(tc["open:live"])}</b>Live rooms made</div>
+          <div><b>${n(tc["join:live"])}</b>Live matches played</div>
         </div>
         <div class="st-funnel"><h3>How far people got today</h3>${funnel.map((v, i) => `<div class="st-bar"><span>Pick ${i + 1}</span><i style="--w:${funnel[0] ? Math.round((v / funnel[0]) * 100) : 0}%"></i><b>${n(v)}</b></div>`).join("")}
           <p class="st-note">Out of everyone who made a first pick. A big drop at one step means people quit there.</p></div>
@@ -1261,13 +1269,312 @@
   }
 
   // links: ?c=<game> opens a challenge, ?join=<code> joins a group
+  // ================= LIVE 1v1 =================
+  // Both players get the same seven teams. Each roll: 30 seconds to lock a pick, then both picks are revealed.
+  // The server owns the clock; we poll it, and draw the timer from its clock (serverNow) so phones that are a bit off still agree.
+  let live = null, liveTimer = null, liveTick = null, liveSel = null, liveOffset = 0, livePhase = "", liveSig = "", livePolling = false, liveLastPoll = 0, liveLocking = false;
+  const liveKeys = () => { try { return JSON.parse(localStorage.getItem("se_live") || "{}"); } catch { return {}; } };
+  const liveKey = (id) => liveKeys()[id] || null;
+  const setLiveKey = (id, key) => { if (!key) return; try { const k = liveKeys(); k[id] = key; const ids = Object.keys(k); if (ids.length > 30) delete k[ids[0]]; localStorage.setItem("se_live", JSON.stringify(k)); } catch {} };
+  const lnow = () => Date.now() + liveOffset;
+  const liveApi = (action, id, extra = {}) => api(action, { id, key: liveKey(id), ...extra });
+  function stopLive() { clearInterval(liveTimer); clearInterval(liveTick); liveTimer = liveTick = null; live = null; liveSel = null; livePhase = liveSig = ""; }
+  const liveLink = (id) => makeLink("live", id);
+
+  function liveSet(v) {
+    if (v.serverNow) liveOffset = v.serverNow - Date.now();
+    if (live && v.round !== live.round) liveSel = null;
+    live = v;
+  }
+  async function livePoll() {
+    if (!live || livePolling) return;
+    livePolling = true; liveLastPoll = Date.now();
+    const id = live.id;
+    try { const v = await liveApi("liveState", id); if (live?.id === id) { liveSet(v); liveDraw(); } } catch {}
+    livePolling = false;
+  }
+
+  // which screen to show right now
+  function liveScreen(v) {
+    const t = lnow();
+    if (v.status === "waiting") return "waiting";
+    if (v.status === "playing" && t < v.startAt) return "countdown";
+    if (v.revealUntil && t < v.revealUntil && v.round > 0) return `reveal${v.round}`;
+    if (v.status === "done") return "done";
+    return "pick";
+  }
+  function liveDraw(force) {
+    const v = live; if (!v) return;
+    const phase = liveScreen(v);
+    const sig = [phase, v.status, v.round, v.locked?.slot, v.oppLocked, v.rematch, v.players.map((p) => p && `${p.name}${p.ready}`).join(","), liveSel?.id].join("|");
+    if (!force && sig === liveSig) return;
+    const fresh = phase !== livePhase;
+    liveSig = sig; livePhase = phase;
+    renderLive(phase, fresh);
+  }
+  function openLive(v) {
+    stopLive(); game = null;
+    liveSet(v);
+    liveDraw(true);
+    window.scrollTo(0, 0);
+    // poll fast while a match is on, slower while waiting or after it ends (to catch a rematch)
+    liveTimer = setInterval(() => {
+      if (!live) return;
+      const gap = live.status === "playing" ? 1500 : 3000;
+      if (Date.now() - liveLastPoll >= gap) livePoll();
+    }, 500);
+    liveTick = setInterval(() => {
+      if (!live) return;
+      liveDraw();
+      const t = lnow(), bar = $("#lvtime"), num = $("#lvsecs");
+      if (live.status === "playing" && live.deadline && livePhase === "pick") {
+        const left = Math.max(0, live.deadline - t);
+        if (bar) bar.style.width = `${(left / live.pickMs) * 100}%`;
+        if (num) { num.textContent = Math.ceil(left / 1000); num.parentElement.classList.toggle("hurry", left < 8000); }
+        if (left <= 0 && Date.now() - liveLastPoll > 700) livePoll(); // time's up: ask the server to settle the roll
+      }
+      const cd = $("#lvcount"); if (cd && live.startAt) cd.textContent = Math.max(1, Math.ceil((live.startAt - t) / 1000));
+      const nx = $("#lvnext"); if (nx && live.revealUntil) nx.textContent = Math.max(0, Math.ceil((live.revealUntil - t) / 1000));
+    }, 200);
+  }
+
+  async function liveNew() {
+    if (!me?.signedIn) return loginSheet("Log in to start a live match. Your friend can join without an account.");
+    if (!me.username) return usernameSheet();
+    try { openLive(await api("liveCreate")); } catch (e) { toast(e.message); }
+  }
+
+  // someone opened a live match link
+  async function liveIntro(id) {
+    let v;
+    try { v = await liveApi("liveState", id); } catch (e) { toast(e.message); return home(); }
+    if (v.you != null) return openLive(v); // already in it (refreshed, or it's your own room)
+    const host = v.players[0]?.name || "A friend";
+    if (v.expired || v.status !== "waiting" || v.players[1]) {
+      toast(v.status === "done" ? "That match is over." : v.expired ? "That match link expired. Ask for a new one." : "That match already started.");
+      return home();
+    }
+    stopLive(); game = null;
+    const saved = (() => { try { return localStorage.getItem("se_guest_name") || ""; } catch { return ""; } })();
+    app.innerHTML = `${topbar()}
+    <div class="wrap lv">
+      <section class="lv-join panel">
+        <div class="lv-kicker">Live 1v1</div>
+        <h1><span>${esc(host)}</span> challenged you</h1>
+        <p>Same seven NFL teams for both of you. Each team, you get 30 seconds to start one player, then both picks are revealed. Highest full-PPR lineup wins.</p>
+        ${me?.signedIn && me.username ? `<p class="lv-as">Playing as <b>${esc(me.username)}</b></p>` : `
+          <label class="lv-name"><span>Your name</span><input id="lvname" maxlength="16" placeholder="What should ${esc(host)} call you?" value="${esc(saved)}" autocomplete="nickname"></label>`}
+        <button class="btn yel big" id="lvjoin">Join the match</button>
+        ${me?.signedIn ? "" : `<button class="lv-login" id="lvlogin">Have an account? Log in first</button>`}
+      </section>
+    </div>`;
+    wireTopbar(false);
+    $("#lvlogin")?.addEventListener("click", () => { try { localStorage.setItem("se_live_pending", id); } catch {} loginSheet("Log in, then you'll head straight into the match."); });
+    $("#lvjoin").addEventListener("click", async (e) => {
+      if (me?.signedIn && !me.username) return usernameSheet();
+      const name = $("#lvname")?.value.trim() || "";
+      try { if (name) localStorage.setItem("se_guest_name", name); } catch {}
+      e.currentTarget.disabled = true;
+      try { const j = await liveApi("liveJoin", id, { name }); setLiveKey(id, j.key); openLive(j); }
+      catch (err) { e.currentTarget.disabled = false; toast(err.message); }
+    });
+  }
+
+  const lvPickRow = (p, opp) => !p ? `<div class="lv-pk empty">—</div>` : `
+    <div class="lv-pk ${p.grade}">
+      <div class="lv-pk-top"><span class="pos p-${p.player.pos}">${SLOT_LABEL[p.slot]}</span>${p.auto ? `<span class="lv-auto">Time ran out</span>` : ""}</div>
+      <div class="lv-pk-nm">${esc(p.player.name)}</div>
+      <div class="lv-pk-pts"><b>${p.player.pts.toFixed(1)}</b> PPR</div>
+      <div class="lv-pk-g"><span class="dot d-${p.grade}"></span>${p.grade === "best" ? "Best on the team" : `Best: ${esc(p.best.name)} ${p.best.pts.toFixed(1)}`}</div>
+    </div>`;
+
+  function lvHead(v, extra = "", chips = "") {
+    const you = v.you, opp = 1 - you, names = v.players.map((p) => p?.name || "Waiting…");
+    return `<section class="lv-vs">
+      <div class="lv-side you"><span class="lv-nm">${esc(names[you])} <i>You</i></span><b>${(v.totals?.[you] ?? 0).toFixed(1)}</b></div>
+      <div class="lv-mid">${extra || `Team <b>${Math.min(v.round + 1, v.rounds)}</b> of ${v.rounds}`}</div>
+      <div class="lv-side opp"><span class="lv-nm">${esc(names[opp])}</span><b>${(v.totals?.[opp] ?? 0).toFixed(1)}</b></div>
+      ${chips ? `<div class="chips lv-chips">${chips}</div>` : ""}
+    </section>`;
+  }
+
+  function renderLive(phase, fresh) {
+    const v = live, you = v.you, opp = you == null ? null : 1 - you;
+    const oppName = esc(v.players[opp]?.name || "your friend");
+    const playing = v.status === "playing";
+    let body = "";
+
+    if (phase === "waiting") {
+      const iAmReady = v.players[you]?.ready, oppIn = v.players[opp];
+      if (!oppIn) {
+        body = `<section class="lv-room panel">
+          <div class="lv-kicker">Live 1v1</div>
+          <h1>Waiting for your friend<span class="lv-dots"><i></i><i></i><i></i></span></h1>
+          <p>Send this link. The match starts the moment they open it and tap Join. They don't need an account.</p>
+          <div class="lv-link"><input readonly value="${esc(liveLink(v.id))}" id="lvlink"><button class="btn navy" id="lvcopy">Copy</button></div>
+          <div class="row2"><button class="btn yel big" id="lvshare">Send the link</button><button class="btn ghost big" data-home>Cancel</button></div>
+          <p class="hint">Keep this page open. The link works for an hour.</p>
+        </section>`;
+      } else if (iAmReady) {
+        body = `<section class="lv-room panel"><div class="lv-kicker">Rematch</div><h1>Waiting for ${oppName} to accept<span class="lv-dots"><i></i><i></i><i></i></span></h1>
+          <p>They'll see a "Join rematch" button on their results. It starts as soon as they tap it.</p>
+          <div class="row2"><button class="btn ghost big" data-home>Leave</button></div></section>`;
+      } else {
+        body = `<section class="lv-room panel"><div class="lv-kicker">Rematch</div><h1>${oppName} wants a rematch</h1>
+          <div class="row2"><button class="btn yel big" id="lvaccept">Let's go</button><button class="btn ghost big" data-home>No thanks</button></div></section>`;
+      }
+    } else if (phase === "countdown") {
+      body = `<section class="lv-count">
+        <div class="lv-count-names"><span>${esc(v.players[you].name)}</span><em>vs</em><span>${oppName}</span></div>
+        <div class="lv-count-num" id="lvcount">${Math.max(1, Math.ceil((v.startAt - lnow()) / 1000))}</div>
+        <p>Seven teams. 30 seconds a pick. Same teams for both of you.</p>
+      </section>`;
+    } else if (phase.startsWith("reveal")) {
+      const r = v.round - 1, roll = v.picks[you][r] || v.picks[opp][r];
+      const mine = v.picks[you][r], theirs = v.picks[opp][r];
+      const diff = mine && theirs ? mine.player.pts - theirs.player.pts : 0;
+      body = `${lvHead(v, `Team <b>${r + 1}</b> of ${v.rounds}`)}
+        <section class="lv-reveal">
+          <div class="lv-rv-team" style="--team:${tc(roll.team)[0]}">${roll.season} ${esc(roll.teamName)}</div>
+          <div class="lv-rv-row">
+            <div><div class="lv-rv-who">You</div>${lvPickRow(mine)}</div>
+            <div><div class="lv-rv-who">${oppName}</div>${lvPickRow(theirs)}</div>
+          </div>
+          <div class="lv-rv-sum">${!mine || !theirs ? "" : mine.player.id === theirs.player.id ? "Same pick. Nobody gains." : diff > 0 ? `You won the roll by <b>${diff.toFixed(1)}</b>` : `${oppName} won the roll by <b>${(-diff).toFixed(1)}</b>`}</div>
+          <div class="lv-rv-next">${v.status === "done" ? "Final score in" : "Next team in"} <b id="lvnext">${Math.max(0, Math.ceil((v.revealUntil - lnow()) / 1000))}</b></div>
+        </section>`;
+    } else if (phase === "pick") {
+      const roll = v.roll, [t1, t2] = tc(roll.team), open = v.open;
+      const usable = (p) => !p.taken && open.some((s) => accepts(s, p.pos));
+      const groups = ["QB", "RB", "WR", "TE"].map((pos) => [pos, roll.players.filter((p) => p.pos === pos)]);
+      const targets = liveSel ? open.filter((s) => accepts(s, liveSel.pos)) : [];
+      const choices = [...new Map(targets.map((s) => [SLOT_LABEL[s], s])).entries()].reverse();
+      const filled = Object.fromEntries(v.picks[you].map((p) => [p.slot, p]));
+      const left = Math.max(0, v.deadline - lnow());
+      const chips = ORDER.map((s) => { const p = filled[s];
+        if (p) return `<div class="chip-s f" style="--c:${tc(p.team)[0]}"><span class="cs">${SLOT_LABEL[s]}</span><span class="cn">${esc(p.player.name.split(" ").slice(-1)[0])}</span><span class="cp">${p.player.pts.toFixed(0)}</span></div>`;
+        if (v.locked?.slot === s) return `<div class="chip-s f"><span class="cs">${SLOT_LABEL[s]}</span><span class="cn">${esc(v.locked.name.split(" ").slice(-1)[0])}</span><span class="cp">?</span></div>`;
+        if (targets.includes(s)) return `<button class="chip-s t" data-lvslot="${s}"><span class="cs">${SLOT_LABEL[s]}</span><span class="cn">Tap</span></button>`;
+        return `<div class="chip-s"><span class="cs">${SLOT_LABEL[s]}</span><span class="cn">Open</span></div>`; }).join("");
+      body = `${lvHead(v, "", chips)}
+        <div class="lv-timer ${left < 8000 ? "hurry" : ""}"><div class="lv-tbar"><i id="lvtime" style="width:${(left / v.pickMs) * 100}%"></i></div><span><b id="lvsecs">${Math.ceil(left / 1000)}</b>s</span></div>
+        <div class="lv-status">${v.locked ? `<span class="ok">You locked ${esc(v.locked.name)} at ${SLOT_LABEL[v.locked.slot]}</span>` : `<span>Pick before time runs out, or you get the worst player left</span>`}<span class="${v.oppLocked ? "ok" : "wait"}">${v.oppLocked ? `${oppName} locked in ✓` : `${oppName} is picking…`}</span></div>
+        <div class="play">
+          <section>
+            <div class="chy ${fresh ? "enter" : ""}" style="--team:${t1};--team-2:${t2}">
+              <span class="tag">Team ${v.round + 1} of ${v.rounds}</span>
+              <div class="slab"><span class="yr">${roll.season}</span><span class="tn">${esc(roll.teamName)}</span></div>
+              <div class="strip"></div>
+            </div>
+            <div class="list ${v.locked ? "lv-locked" : ""}">
+              ${v.locked ? `<div class="lv-lockmsg">Locked in. Waiting for ${oppName}, then both picks are revealed.</div>` : `<div class="sub">Pick one player. Points stay hidden until you both lock in.</div>`}
+              ${groups.map(([pos, ps]) => !ps.length ? "" : !open.some((s) => accepts(s, pos)) ? `<h4 class="filled-pos">${POS_NAME[pos]} <span>${pos} spot${pos === "RB" || pos === "WR" ? "s" : ""} filled</span></h4>` : `<h4>${POS_NAME[pos]}</h4>${ps.map((p) => `
+                <button class="prow" style="--pc:${PC[pos]}" data-lvpid="${esc(p.id)}" aria-pressed="${liveSel?.id === p.id || v.locked?.name === p.name}" ${usable(p) && !v.locked ? "" : "disabled"}>
+                  <span><span class="nm">${esc(p.name)}</span>${p.taken ? `<span class="meta"><br>Already in your lineup</span>` : ""}</span>
+                  <span class="pos p-${pos}">${pos}</span><span class="go">Start</span>
+                </button>`).join("")}`).join("")}
+              ${liveSel && !v.locked ? `<div class="list-foot"><span>Where does ${esc(liveSel.name)} start?</span><span class="spot-picks">${choices.map(([l, s]) => `<button class="btn yel" data-lvslot="${s}">${l}</button>`).join("")}</span></div>` : ""}
+            </div>
+          </section>
+          <section class="turf lineup" aria-label="Your lineup">
+            <div class="ph"><h2>Your lineup</h2><span class="aside">${v.picks[you].length} of 7</span></div>
+            ${ORDER.map((s) => { const p = filled[s];
+              if (p) return `<div class="slot f" style="--c:${tc(p.team)[0]}"><span class="s ${s === "FLEX" ? "sm" : ""}">${SLOT_LABEL[s]}</span><span class="p"><div class="nm"><span class="dot d-${p.grade}"></span>${esc(p.player.name)}</div><div class="meta">${p.season} ${esc(p.teamName)}</div></span><span class="pt">${p.player.pts.toFixed(1)}</span></div>`;
+              if (v.locked?.slot === s) return `<div class="slot lv-pend"><span class="s ${s === "FLEX" ? "sm" : ""}">${SLOT_LABEL[s]}</span><span class="p"><div class="nm">${esc(v.locked.name)}</div><div class="meta">Locked · revealed soon</div></span><span class="pt">?</span></div>`;
+              if (targets.includes(s)) return `<button class="slot t" data-lvslot="${s}"><span class="s ${s === "FLEX" ? "sm" : ""}">${SLOT_LABEL[s]}</span><span class="p"><div class="nm">Start ${esc(liveSel.name.split(" ").slice(-1)[0])} here</div></span><span class="pt">Tap</span></button>`;
+              return `<div class="slot"><span class="s ${s === "FLEX" ? "sm" : ""}">${SLOT_LABEL[s]}</span><span class="p"><div class="meta">${s === "FLEX" ? "Open · RB, WR or TE" : "Open"}</div></span><span></span></div>`;
+            }).join("")}
+          </section>
+        </div>`;
+    } else if (phase === "done") {
+      const R = v.result, me_ = R.sides[you], op = R.sides[opp];
+      const won = R.winner === you, tie = R.winner == null;
+      const mine = Object.fromEntries(v.picks[you].map((p) => [p.slot, p])), theirs = Object.fromEntries(v.picks[opp].map((p) => [p.slot, p]));
+      body = `<section class="lv-final panel ${won ? "won" : tie ? "tie" : "lost"}">
+          <div class="lv-kicker">Live 1v1 · Final</div>
+          <h1>${won ? "You win" : tie ? "Dead even" : `${oppName} wins`}</h1>
+          <div class="lv-score"><div><span>${esc(v.players[you].name)}</span><b>${me_.total.toFixed(1)}</b><em>${me_.record.wins}-${me_.record.losses} · ${me_.pct}%</em><i>${me_.grid}</i></div>
+            <div class="lv-dash">–</div>
+            <div><span>${oppName}</span><b>${op.total.toFixed(1)}</b><em>${op.record.wins}-${op.record.losses} · ${op.pct}%</em><i>${op.grid}</i></div></div>
+          <p class="lv-perf">Perfect lineup from these teams: <b>${R.optimal.toFixed(1)}</b></p>
+          <div class="lv-final-btns">
+            <button class="btn yel big lv-rm" id="lvrematch">${v.rematch ? "Join rematch" : "Rematch"}</button>
+            <button class="btn navy" id="lvsharefinal">Share</button>
+            <button class="btn ghost" id="lvnew">New match</button>
+            <button class="btn ghost" data-home>Home</button>
+          </div>
+          ${v.rematch ? `<p class="lv-rm-note">${oppName} wants a rematch.</p>` : ""}
+        </section>
+        <section class="panel matchup picks">
+          <div class="ph"><h2>Lineups</h2><span class="aside">You · ${oppName}</span></div>
+          <div class="turf field-rows">
+          ${ORDER.map((s) => { const a = mine[s], b = theirs[s]; return `<div class="mrow">
+            <div class="pl"><div><div class="nm"><span class="dot d-${a.grade}"></span>${esc(a.player.name)}</div><div class="yr">${a.season} ${esc(a.team)}${a.auto ? " · auto" : ""} <b>· ${a.player.pts.toFixed(1)}</b></div></div></div>
+            <span class="pt ${a.player.pts >= b.player.pts ? "same" : ""}">${a.player.pts.toFixed(1)}</span>
+            <span class="mid"><span class="pos p-${SLOT_LABEL[s]}">${SLOT_LABEL[s]}</span></span>
+            <span class="pt r">${b.player.pts.toFixed(1)}</span>
+            <div class="pl r"><div><div class="nm"><span class="dot d-${b.grade}"></span>${esc(b.player.name)}</div><div class="yr">${b.season} ${esc(b.team)}${b.auto ? " · auto" : ""} <b>· ${b.player.pts.toFixed(1)}</b></div></div></div>
+          </div>`; }).join("")}
+          </div>
+        </section>`;
+    }
+
+    app.innerHTML = `${topbar(`<span class="modetag">Live 1v1</span>${playing ? `<button class="navbtn exit" data-lvleave>Leave</button>` : ""}`)}<div class="wrap lv">${body}</div>`;
+    wireTopbar(false);
+    $("[data-lvleave]")?.addEventListener("click", () => askConfirm("Leave the match?", "The match keeps going without you. Every team you miss gives you the worst player left.", "Leave").then((ok) => { if (ok) { stopLive(); home(); } }));
+    // a plain home link mid-match also asks first
+    if (playing) app.querySelectorAll("[data-home]").forEach((a) => { const c = a.cloneNode(true); a.replaceWith(c); c.addEventListener("click", (e) => { e.preventDefault(); $("[data-lvleave]")?.click(); }); });
+    else app.querySelectorAll("[data-home]").forEach((a) => a.addEventListener("click", () => stopLive(), { capture: true }));
+
+    const shareLink = async () => {
+      const link = liveLink(v.id), text = `Play me live on Start 'Em 🏈 Same 7 NFL teams, 30 seconds a pick. ${link}`;
+      try { if (navigator.share) return await navigator.share({ text, title: "Start 'Em Live" }); } catch (e) { if (e.name === "AbortError") return; }
+      try { await navigator.clipboard.writeText(link); toast("Link copied. Send it to your friend."); } catch { toast(link); }
+    };
+    $("#lvshare")?.addEventListener("click", shareLink);
+    $("#lvcopy")?.addEventListener("click", async () => { try { await navigator.clipboard.writeText(liveLink(v.id)); toast("Link copied."); } catch { $("#lvlink").select(); } });
+    $("#lvaccept")?.addEventListener("click", async () => { try { const j = await liveApi("liveJoin", v.id); setLiveKey(v.id, j.key); liveSet(j); liveDraw(true); } catch (e) { toast(e.message); } });
+    $("#lvnew")?.addEventListener("click", () => { stopLive(); liveNew(); });
+    $("#lvrematch")?.addEventListener("click", async (e) => {
+      e.currentTarget.disabled = true;
+      try { const r = await liveApi("liveRematch", v.id); setLiveKey(r.id, r.key || liveKey(v.id)); openLive(r); }
+      catch (err) { e.currentTarget.disabled = false; toast(err.message); }
+    });
+    $("#lvsharefinal")?.addEventListener("click", async () => {
+      const R = v.result, a = R.sides[you], b = R.sides[opp], who = v.players[opp].name;
+      const line = R.winner === you ? `I beat ${who}` : R.winner == null ? `I tied ${who}` : `${who} beat me`;
+      const text = `Start 'Em Live 🏈 ${line} ${a.total.toFixed(1)} to ${b.total.toFixed(1)}\n${a.grid}\nPlay me: ${(CFG.shareBase || SITE_URL).replace(/\/$/, "")}/`;
+      try { if (navigator.share) return await navigator.share({ text, title: "Start 'Em Live" }); } catch (err) { if (err.name === "AbortError") return; }
+      try { await navigator.clipboard.writeText(text); toast("Copied. Paste it in the group chat."); } catch { toast("Couldn't reach the clipboard in this browser."); }
+    });
+    app.querySelectorAll("[data-lvpid]").forEach((b) => b.addEventListener("click", () => {
+      const p = v.roll.players.find((x) => x.id === b.dataset.lvpid);
+      liveSel = liveSel?.id === p.id ? null : p;
+      const spots = liveSel ? v.open.filter((s) => accepts(s, p.pos)) : [];
+      if (spots.length === 1) return liveLock(spots[0]);
+      liveDraw(true);
+    }));
+    app.querySelectorAll("[data-lvslot]").forEach((b) => b.addEventListener("click", () => liveLock(b.dataset.lvslot)));
+  }
+
+  async function liveLock(slot) {
+    if (!live || !liveSel || liveLocking) return;
+    liveLocking = true;
+    const id = live.id, p = liveSel;
+    try { const v = await liveApi("livePick", id, { player: p.id, slot }); liveSel = null; liveSet(v); liveDraw(true); }
+    catch (e) { toast(e.message); livePoll(); }
+    finally { liveLocking = false; }
+  }
+
   async function handleLinks() {
     const q = new URLSearchParams(location.search);
-    const h = location.hash.match(/^#(c|join)-([A-Za-z0-9-]+)$/);
+    const h = location.hash.match(/^#(c|join|live)-([A-Za-z0-9-]+)$/);
     const c = q.get("c") || (h && h[1] === "c" ? h[2] : null), join = q.get("join") || (h && h[1] === "join" ? h[2] : null);
-    if (!c && !join) return;
+    const lv = q.get("live") || (h && h[1] === "live" ? h[2] : null);
+    if (!c && !join && !lv) return;
     try { history.replaceState(null, "", location.pathname); } catch {}
     localStorage.setItem("se_seen_how", "1");
+    if (lv) return liveIntro(lv);
     if (c) return challengeIntro(c);
     if (join) {
       if (me?.signedIn && me.username) {

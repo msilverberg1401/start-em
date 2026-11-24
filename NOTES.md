@@ -26,6 +26,7 @@ Seven rolls fill **QB, RB, RB, WR, WR, TE, FLEX**. Your score is the lineup's to
 | **Casual** | No | 1 team + 1 year | Stats on (games played, usage, years in the NFL) as hints. There's a Stats on/off switch. No leaderboard. |
 | **Past Dailies** (`archive`) | Optional | none | Replay an earlier Daily. It doesn't count on the board. |
 | **Challenge** | Optional | copies the source game's rules | A friend gets your exact rolls, then sees head to head. A challenge from today's Daily sends them to the Daily instead. |
+| **Live 1v1** | Host only (friend can be a guest) | none | Real-time match from an invite link (`?live=<id>`). Same 7 teams, 30s to lock each pick, both picks revealed together (5s), then the next team. A missed pick gets the worst player left. Rematch button. Server code: `supabase/functions/game/live.ts`, table `matches`. The browser polls `liveState` every 1.5s. |
 
 **Themed Dailies** (`themeFor()` in `game.ts`): Throwback Thursday (1999–2009), Division Sunday (rotating division), Thanksgiving (Lions + Cowboys), Champions Daily (SB winners, on Super Bowl Sunday).
 
@@ -81,9 +82,9 @@ README.md                  full one-time setup guide (Supabase, Google, Brevo, d
 - The browser POSTs `{ action: "...", ...params }` to `/functions/v1/game`, with the login token if signed in.
 - **Anti-cheat:** points stay on the server until a pick is locked. Rosters are sorted alphabetically so the order can't leak who scored most. The Daily's rolls are seeded with the secret `DAILY_SALT` so nobody can compute future Dailies from the public code. Daily lineups are never used as link previews (they'd be spoilers).
 
-**API actions (`api.ts`):** `me`, `setUsername`, `start` (daily/ranked/casual/archive/challenge), `pick`, `reroll`, `claimDaily`, `dayCard`, `scorecard`, `dailyStats`, `archiveList`, `leaderboard` (daily/week/ranked/alltime, optional group), `createGroup`, `joinGroup`, `leaveGroup`, `profile`, `challengeInfo`, `uploadCard`, `savePush`, `deletePush`, `adminStats`.
+**API actions (`api.ts`):** live: `liveCreate`, `liveJoin`, `liveState`, `livePick`, `liveRematch` (in `live.ts`); `me`, `setUsername`, `start` (daily/ranked/casual/archive/challenge), `pick`, `reroll`, `claimDaily`, `dayCard`, `scorecard`, `dailyStats`, `archiveList`, `leaderboard` (daily/week/ranked/alltime, optional group), `createGroup`, `joinGroup`, `leaveGroup`, `profile`, `challengeInfo`, `uploadCard`, `savePush`, `deletePush`, `adminStats`.
 
-**Database tables:** `profiles`, `games` (state is stored as JSON. Indexes enforce one Daily per user per day and one active Ranked game), `daily_results`, `ranked_stats`, `best_lineups`, `groups`, `group_members`, `user_stats`, `stat_counts` (owner counters), plus push subscriptions and the `cards` storage bucket.
+**Database tables:** `profiles`, `games` (state is stored as JSON. Indexes enforce one Daily per user per day and one active Ranked game), `daily_results`, `ranked_stats`, `best_lineups`, `groups`, `group_members`, `user_stats`, `stat_counts` (owner counters), `matches` (live 1v1, saved with a version check so two requests can't overwrite each other), plus push subscriptions and the `cards` storage bucket.
 
 ## Config and secrets (names only, never paste the values into a chat)
 - **GitHub Actions secrets:** `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`

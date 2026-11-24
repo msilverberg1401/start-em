@@ -31,6 +31,17 @@ export function makeStore(sb) {
     // anonymous casual/challenge games are throwaway; prune ones older than 2 days so the free database stays small
     cleanupCasual: async () => { await sb.from("games").delete().is("user_id", null).lt("created_at", new Date(Date.now() - 2 * 864e5).toISOString()); },
     getGame: (id) => one(sb.from("games").select("*").eq("id", id).maybeSingle()),
+    // live matches. saveMatch only writes if nobody else saved since we read it; returns false if they did.
+    getMatch: (id) => one(sb.from("matches").select("*").eq("id", id).maybeSingle()),
+    insertMatch: (m) => one(sb.from("matches").insert(m).select().single()),
+    async saveMatch(m) {
+      const { data, error } = await sb.from("matches").update({ status: m.status, state: m.state, version: m.version + 1, updated_at: new Date().toISOString() })
+        .eq("id", m.id).eq("version", m.version).select("id").maybeSingle();
+      if (error) throw error;
+      if (data) m.version += 1;
+      return !!data;
+    },
+    cleanupMatches: async () => { await sb.from("matches").delete().lt("created_at", new Date(Date.now() - 3 * 864e5).toISOString()); },
     async findGame(where) {
       let q = sb.from("games").select("*");
       for (const [k, v] of Object.entries(where)) q = q.eq(k, v);

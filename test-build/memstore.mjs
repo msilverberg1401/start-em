@@ -1,5 +1,5 @@
 export function memStore() {
-  const T = { profiles: new Map(), games: new Map(), daily: new Map(), ranked: new Map(), best: new Map(), stats: new Map(), groups: new Map(), members: [] };
+  const T = { matches: new Map(), profiles: new Map(), games: new Map(), daily: new Map(), ranked: new Map(), best: new Map(), stats: new Map(), groups: new Map(), members: [] };
   const clone = (x) => (x == null ? null : JSON.parse(JSON.stringify(x)));
   let t = 0;
   return {
@@ -11,6 +11,9 @@ export function memStore() {
       T.profiles.set(id, { id, username }); return true;
     },
     async getGame(id) { return clone(T.games.get(id)); },
+    async getMatch(id) { return clone(T.matches.get(id) || null); },
+    async insertMatch(m) { const row = { ...clone(m), id: crypto.randomUUID(), version: 0, created_at: new Date().toISOString() }; T.matches.set(row.id, row); return clone(row); },
+    async saveMatch(m) { const cur = T.matches.get(m.id); if (!cur || cur.version !== m.version) return false; m.version += 1; T.matches.set(m.id, { ...cur, status: m.status, state: clone(m.state), version: m.version }); return true; },
     async findGame(w) { return clone([...T.games.values()].filter((g) => Object.entries(w).every(([k, v]) => g[k] === v)).sort((a, b) => b.created_at - a.created_at)[0] || null); },
     async insertGame(g) {
       if (g.mode === "daily" && g.user_id && [...T.games.values()].some((x) => x.mode === "daily" && x.user_id === g.user_id && x.play_date === g.play_date)) throw new Error("unique violation daily");

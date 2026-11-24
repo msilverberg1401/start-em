@@ -4,6 +4,7 @@ import {
   SLOTS, MODES, slotAccepts, rollQueue, todayET, dailyNumber, getRoll, visible, LAUNCH, themeFor, dailyQueue, publicTheme, streaks, weekStart,
   publicRoll, reveal, gradePick, optimalLineup, EMOJI, record, isAllGreen, rerollKey, tierFor, srChange, PLACEMENT_GAMES, START_SR,
 } from "./game.ts";
+import { liveActions } from "./live.ts";
 
 const withTier = (r) => r && { ...r, sr: Number(r.sr ?? START_SR), tier: tierFor(Number(r.sr ?? START_SR)), peakTier: tierFor(Number(r.peak ?? r.sr ?? START_SR)), placing: r.games < PLACEMENT_GAMES, placementTotal: PLACEMENT_GAMES };
 
@@ -140,6 +141,8 @@ const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O or 1/I
 const makeCode = () => Array.from({ length: 6 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join("");
 
 const actions = {
+  ...liveActions({ fail, needUser }),
+
   async me({ auth, db }) {
     const today = todayET();
     const theme = publicTheme(themeFor(today));
@@ -528,6 +531,8 @@ function track(db, action, out, body = {}) {
   if (!db.bump) return;
   const keys = action === "me" ? [...(body.pv ? ["visit"] : []), ...(body.uv ? ["uvisit"] : [])]
     : action === "start" && out?.mode ? [`open:${out.mode}`, ...(body.us ? ["ustart"] : [])]
+    : action === "liveCreate" ? ["open:live"]
+    : action === "liveJoin" && out?.status === "playing" && out?.round === 0 && !out?.picks?.[0]?.length ? ["join:live"]
     : action === "pick" && out?.picks ? [`pick:${out.picks.length}`, ...(out.status === "done" ? [`finish:${out.mode}`] : [])]
     : [];
   for (const k of keys) {
