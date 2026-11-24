@@ -459,7 +459,7 @@
   function boardHTML(tab, group, d) {
       const past = tab === "daily" && d.date !== me?.today;
       const pick = tab === "daily" ? dayPicker(d) : "";
-      const perfBtn = tab === "daily" && d.rows.length ? `<button class="perf-link" data-perfect="${d.date}">See the perfect lineup for Daily #${d.number} ›</button>` : "";
+      const perfBtn = tab === "daily" && d.canReveal && d.rows.length ? `<button class="perf-link" data-perfect="${d.date}">See the perfect lineup for Daily #${d.number} ›</button>` : "";
       if (!d.rows.length) {
         const who = group ? "in this group" : "";
         return pick + `<div class="lb-empty">${tab === "daily" ? (past ? `Nobody ${who} played Daily #${d.number}.` : `Nobody ${who} has finished today's Daily yet. Play it and take the top spot.`) : tab === "week" ? `Nobody ${who} has played a Daily this week yet. The week resets every Tuesday.` : tab === "ranked" ? `Nobody ${who} is on the ladder yet. Finish 5 Ranked placement games to show up here.` : `No lineups ${who} yet. Log in and finish a Daily or Ranked game to set the record. Casual, challenges and past Dailies don't count.`}</div>`;
@@ -478,7 +478,7 @@
         }</tr>`).join("")}</tbody></table>
         ${tab === "alltime" ? `<p class="lb-note">Daily and Ranked games only, one best lineup per player. Casual, challenges and past Dailies don't count. Log in to get on the board.</p>` : ""}
         ${tab === "week" ? `<p class="lb-note">Every Daily from ${shortDate(d.from)} to ${shortDate(weekEnd(d.from))} added up. Play every day to climb. Resets Tuesday.</p>` : ""}
-        ${tab === "daily" ? `<p class="lb-note">${d.players} ${group ? "in this group " : ""}played Daily #${d.number}. Everyone had the same teams, so it's ranked by points. ${past ? "Tap a player to see their lineup. Missed this one? Play it in past Dailies first." : me?.dailyDone ? "Tap a player to see their lineup." : "Finish the Daily to see everyone's lineups."}</p>${perfBtn}` : ""}`;
+        ${tab === "daily" ? `<p class="lb-note">${d.players} ${group ? "in this group " : ""}played Daily #${d.number}. Everyone had the same teams, so it's ranked by points. ${d.canReveal ? "Tap a player to see their lineup." : `Finish Daily #${d.number} to see everyone's lineups and the perfect lineup. ${past ? "You can play it from Past Dailies." : ""}`}</p>${perfBtn}` : ""}`;
   }
   async function loadBoard() {
     const el = $("#lb"); if (!el) return;
