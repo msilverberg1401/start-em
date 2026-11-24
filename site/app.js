@@ -705,6 +705,7 @@
       ov.remove(); document.removeEventListener("keydown", key);
       renderGame(true);
       const el = $("#total"); if (el) countUp(el, prevTotal, game.total);
+      const mini = $("#mtotal"); if (mini) mini.textContent = game.total.toFixed(1);
       lastTotal = game.total;
     };
     const key = (e) => { if (e.key === "Enter" || e.key === "Escape") go(); };
@@ -1149,6 +1150,7 @@
     let p;
     try { p = await api("profile"); } catch (e) { return toast(e.message); }
     const st = p.stats || { games: 0, greens: 0, best_wins: 0 };
+    const live = p.liveRecord || { wins: 0, losses: 0, ties: 0 };
 
     const days = Array.from({ length: 21 }, (_, i) => { const d = new Date(Date.parse(me.today) - (20 - i) * 864e5).toISOString().slice(0, 10); return [d, p.daily.find((x) => x.play_date === d)]; });
     const tile = (label, value, sub = "") => `<div class="tile"><span>${label}</span><b>${value}</b>${sub ? `<small>${sub}</small>` : ""}</div>`;
@@ -1164,6 +1166,7 @@
           ${tile("Best score", p.best ? Number(p.best.total).toFixed(1) : "–", p.best ? `${p.best.record} season` : "Daily or Ranked")}
           ${tile("Games played", st.games)}
           ${tile("Green picks", st.greens, st.games ? `${Math.round((st.greens / (st.games * 7)) * 100)}% of picks` : "")}
+          ${tile("Live record", `${live.wins}–${live.losses}–${live.ties}`, "W–L–T")}
         </div>
       </section>
 

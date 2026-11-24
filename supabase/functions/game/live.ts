@@ -107,8 +107,14 @@ export function liveActions({ fail, needUser }) {
       const now = Date.now();
       const ticked = tick(m, now);
       const res = await fn(m, now);
-      if (!ticked && !res?.changed) return { m, now, res };
-      if (await db.saveMatch(m)) return { m, now, res };
+      if (!ticked && !res?.changed) {
+        if (m.status === "done") await db.recordLiveResults?.(m.id, m.state.seats, m.state.result?.winner);
+        return { m, now, res };
+      }
+      if (await db.saveMatch(m)) {
+        if (m.status === "done") await db.recordLiveResults?.(m.id, m.state.seats, m.state.result?.winner);
+        return { m, now, res };
+      }
     }
     fail(503, "The match is busy. Try again.");
   }

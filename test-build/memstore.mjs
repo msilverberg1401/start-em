@@ -1,5 +1,5 @@
 export function memStore() {
-  const T = { matches: new Map(), profiles: new Map(), games: new Map(), daily: new Map(), ranked: new Map(), best: new Map(), stats: new Map(), groups: new Map(), members: [] };
+  const T = { matches: new Map(), liveResults: new Map(), profiles: new Map(), games: new Map(), daily: new Map(), ranked: new Map(), best: new Map(), stats: new Map(), groups: new Map(), members: [] };
   const clone = (x) => (x == null ? null : JSON.parse(JSON.stringify(x)));
   let t = 0;
   return {
@@ -14,6 +14,18 @@ export function memStore() {
     async putHandoff(id, rt) { (T.handoffs ||= new Map()).set(id, rt); },
     async takeHandoff(id) { const m = T.handoffs || new Map(); const rt = m.get(id) || null; m.delete(id); return rt; },
     async getMatch(id) { return clone(T.matches.get(id) || null); },
+    async recordLiveResults(matchId, seats, winner) {
+      seats.forEach((seat, i) => {
+        if (!seat?.uid) return;
+        const key = `${matchId}/${seat.uid}`;
+        if (!T.liveResults.has(key)) T.liveResults.set(key, { match_id: matchId, user_id: seat.uid, result: winner == null ? "tie" : winner === i ? "win" : "loss" });
+      });
+    },
+    async getLiveRecord(uid) {
+      const record = { wins: 0, losses: 0, ties: 0 };
+      for (const row of T.liveResults.values()) if (row.user_id === uid) record[row.result === "win" ? "wins" : row.result === "loss" ? "losses" : "ties"]++;
+      return record;
+    },
     async insertMatch(m) { const row = { ...clone(m), id: crypto.randomUUID(), version: 0, created_at: new Date().toISOString() }; T.matches.set(row.id, row); return clone(row); },
     async saveMatch(m) { const cur = T.matches.get(m.id); if (!cur || cur.version !== m.version) return false; m.version += 1; T.matches.set(m.id, { ...cur, status: m.status, state: clone(m.state), version: m.version }); return true; },
     async findGame(w) { return clone([...T.games.values()].filter((g) => Object.entries(w).every(([k, v]) => g[k] === v)).sort((a, b) => b.created_at - a.created_at)[0] || null); },

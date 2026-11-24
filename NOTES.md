@@ -30,7 +30,7 @@ Seven rolls fill **QB, RB, RB, WR, WR, TE, FLEX**. Your score is the lineup's to
 
 **Themed Dailies** (`themeFor()` in `game.ts`): Throwback Thursday (1999–2009), Division Sunday (rotating division), Thanksgiving (Lions + Cowboys), Champions Daily (SB winners, on Super Bowl Sunday).
 
-**Other features:** Groups (private standings joined by a 6-character code, max 10 per user), Profile (streaks with one auto streak-freeze per week, history calendar, best lineup, SR/tier, lifetime stats), Daily standings with a 7-day back stepper, viewing others' lineups (only after you've finished that Daily), Daily stats ("how everyone picked"), a PWA you can install, a daily push reminder at 10am ET, and an owner-only stats page (`adminStats`).
+**Other features:** Groups (private standings joined by a 6-character code, max 10 per user), Profile (streaks with one auto streak-freeze per week, history calendar, best lineup, SR/tier, lifetime stats, and a Live 1v1 W–L–T record), Daily standings with a 7-day back stepper, viewing others' lineups (only after you've finished that Daily), Daily stats ("how everyone picked"), a PWA you can install, a daily push reminder at 10am ET, and an owner-only stats page (`adminStats`).
 
 ## Scoring rules (all server side)
 - **Pick grade:** best (🟩, ≥99.9% of the best eligible player on that roll for that slot), close (🟨, ≥75%), miss (🟥).

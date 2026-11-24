@@ -1,5 +1,5 @@
 globalThis.__SE_LAUNCH = "2026-11-01";
-const { handle } = await import("./api2.bundle.mjs");
+const { handle } = await import("../supabase/functions/game/api.ts");
 const { memStore } = await import("./memstore.mjs");
 const db = memStore();
 let fails = 0; const check = (l, c, x = "") => { if (!c) fails++; console.log(c ? "PASS" : "FAIL", l, x); };

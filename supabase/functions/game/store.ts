@@ -39,6 +39,24 @@ export function makeStore(sb) {
       return row?.refresh_token || null;
     },
     getMatch: (id) => one(sb.from("matches").select("*").eq("id", id).maybeSingle()),
+    async recordLiveResults(matchId, seats, winner) {
+      const rows = seats.flatMap((seat, i) => seat?.uid ? [{
+        match_id: matchId,
+        user_id: seat.uid,
+        result: winner == null ? "tie" : winner === i ? "win" : "loss",
+      }] : []);
+      if (!rows.length) return;
+      const { error } = await sb.from("live_results").upsert(rows, { onConflict: "match_id,user_id", ignoreDuplicates: true });
+      if (error) throw error;
+    },
+    async getLiveRecord(uid) {
+      const outcomes = ["win", "loss", "tie"];
+      const rows = await Promise.all(outcomes.map((result) =>
+        sb.from("live_results").select("match_id", { count: "exact", head: true }).eq("user_id", uid).eq("result", result)
+      ));
+      for (const row of rows) if (row.error) throw row.error;
+      return { wins: rows[0].count || 0, losses: rows[1].count || 0, ties: rows[2].count || 0 };
+    },
     insertMatch: (m) => one(sb.from("matches").insert(m).select().single()),
     async saveMatch(m) {
       const { data, error } = await sb.from("matches").update({ status: m.status, state: m.state, version: m.version + 1, updated_at: new Date().toISOString() })

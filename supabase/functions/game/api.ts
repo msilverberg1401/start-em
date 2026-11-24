@@ -436,6 +436,7 @@ const actions = {
       ranked: withTier(await db.getRanked(auth.id)),
       best: await (async () => { const b = await db.getBestFull(auth.id); return b && { ...b, record: recStr(b.total, b) }; })(),
       stats: await db.getStats(auth.id),
+      liveRecord: await db.getLiveRecord(auth.id),
       groups: await db.myGroups(auth.id),
     };
   },
