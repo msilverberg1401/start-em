@@ -1530,9 +1530,9 @@
     else app.querySelectorAll("[data-home]").forEach((a) => a.addEventListener("click", () => stopLive(), { capture: true }));
 
     const shareLink = async () => {
-      const link = liveLink(v.id), text = `Play me live on Start 'Em 🏈 Same 7 NFL teams, 30 seconds a pick. ${link}`;
+      const link = liveLink(v.id), text = `Come play me live in a Start 'Em 1v1 🏈 We’ll get the same 7 NFL teams, with 30 seconds per pick. Think you can beat me? Join here: ${link}`;
       try { if (navigator.share) return await navigator.share({ text, title: "Start 'Em Live" }); } catch (e) { if (e.name === "AbortError") return; }
-      try { await navigator.clipboard.writeText(link); toast("Link copied. Send it to your friend."); } catch { toast(link); }
+      try { await navigator.clipboard.writeText(text); toast("Invite copied. Send it to your friend."); } catch { toast(link); }
     };
     $("#lvshare")?.addEventListener("click", shareLink);
     $("#lvcopy")?.addEventListener("click", async () => { try { await navigator.clipboard.writeText(liveLink(v.id)); toast("Link copied."); } catch { $("#lvlink").select(); } });
