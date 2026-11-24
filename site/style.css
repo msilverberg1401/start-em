@@ -322,7 +322,7 @@ h1, h2, h3, h4 { margin: 0; }
 .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .hint { color: var(--ink-3); font-size: 14px; margin: 0; }
 
-#toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 140%); background: var(--solid); color: #fff; padding: 12px 18px; border-radius: 6px; font-weight: 600; transition: transform .25s, opacity .25s; z-index: 50; max-width: calc(100% - 40px); opacity: 0; pointer-events: none; box-shadow: inset 5px 0 0 var(--yel), 0 14px 30px rgba(11,18,32,.3); }
+#toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 140%); background: var(--solid); color: #fff; padding: 12px 18px; border-radius: 6px; font-weight: 600; transition: transform .25s, opacity .25s; z-index: 50; max-width: calc(100% - 32px); opacity: 0; pointer-events: none; box-shadow: inset 5px 0 0 var(--yel), 0 14px 30px rgba(11,18,32,.3); }
 #toast.show { transform: translate(-50%, 0); opacity: 1; }
 
 /* ---------- responsive ---------- */
@@ -1029,3 +1029,10 @@ html[data-theme="dark"] .matchup .mrow .yr { color: #56667D; }
 .site-foot.social a:hover { background: var(--solid); color: #fff; }
 .site-foot.social svg { width: 16px; height: 16px; fill: currentColor; }
 .site-foot.social .handle { font-size: 13px; font-weight: 700; color: var(--ink-3); }
+
+/* perfect lineup: in scorecards and from the Daily standings */
+.sc-perf-h { display: flex; justify-content: space-between; align-items: baseline; margin: 18px 0 8px; font-family: var(--display); font-weight: 900; font-style: italic; font-size: 22px; }
+.sc-perf-h span { color: var(--ink-3); font-size: 18px; }
+.sc-lineup.perf .slot .pt { color: var(--go); }
+.perf-link { display: block; width: calc(100% - 32px); margin: 0 16px 14px; padding: 11px 14px; border: 0; border-radius: 6px; background: var(--solid); color: #fff; font: 800 16px var(--display); font-style: italic; text-align: left; cursor: pointer; box-shadow: inset 4px 0 0 var(--yel); }
+.perf-link:hover, .perf-link:focus-visible { filter: brightness(1.12); outline: none; }

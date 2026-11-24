@@ -255,7 +255,7 @@ const actions = {
     if (!validDate(date)) fail(400, "Bad date.");
     const g = await finishedDayGame(db, auth.id, date);
     if (!g) fail(404, "You didn't finish that Daily.");
-    return summary(db, g);
+    return { ...(await summary(db, g)), perfect: perfectDaily(date) };
   },
 
   // Someone else's Daily lineup from the standings. Only once you've finished that same Daily yourself,
@@ -268,7 +268,16 @@ const actions = {
     const who = await db.findProfileByName(String(body.username || "").trim());
     const g = who && (await finishedDayGame(db, who.id, date));
     if (!g) fail(404, "Couldn't find that lineup.");
-    return summary(db, g);
+    return { ...(await summary(db, g)), perfect: perfectDaily(date) };
+  },
+
+  // the best possible lineup for a Daily (same seven teams for everyone). Only after you've finished it.
+  async perfect({ auth, db, body }) {
+    await needUser(auth, db);
+    const date = body.date || todayET();
+    if (!validDate(date) || date < LAUNCH || date > todayET()) fail(400, "Bad date.");
+    if (!(await finishedDayGame(db, auth.id, date))) fail(403, `Finish Daily #${dailyNumber(date)} to see its perfect lineup.`);
+    return { date, number: dailyNumber(date), ...perfectDaily(date) };
   },
 
   async archiveList({ auth, db }) {
@@ -414,6 +423,8 @@ const actions = {
   },
 };
 
+// Dailies have no rerolls, so the first seven rolls are everyone's teams
+const perfectDaily = (date) => optimalLineup(dailyQueue(date).slice(0, 7));
 const dayAdd = (d, n) => new Date(Date.parse(d) + n * 864e5).toISOString().slice(0, 10);
 const validDate = (d) => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d);
 

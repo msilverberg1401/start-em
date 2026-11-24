@@ -413,6 +413,7 @@
     $("#lb")?.addEventListener("click", (e) => {
       const dp = e.target.closest("[data-lbdate]");
       if (dp) { lbDate = dp.dataset.lbdate === me.today ? null : dp.dataset.lbdate; return loadBoard(); }
+      const pf = e.target.closest("[data-perfect]"); if (pf) return perfectSheet(pf.dataset.perfect);
       const tr = e.target.closest("tr[data-who]"); if (tr) lineupSheet(tr.dataset.date, tr.dataset.who);
     });
     app.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => {
@@ -449,6 +450,7 @@
   function boardHTML(tab, group, d) {
       const past = tab === "daily" && d.date !== me?.today;
       const pick = tab === "daily" ? dayPicker(d) : "";
+      const perfBtn = tab === "daily" && d.rows.length ? `<button class="perf-link" data-perfect="${d.date}">See the perfect lineup for Daily #${d.number} ›</button>` : "";
       if (!d.rows.length) {
         const who = group ? "in this group" : "";
         return pick + `<div class="lb-empty">${tab === "daily" ? (past ? `Nobody ${who} played Daily #${d.number}.` : `Nobody ${who} has finished today's Daily yet. Play it and take the top spot.`) : tab === "week" ? `Nobody ${who} has played a Daily this week yet. The week resets every Tuesday.` : tab === "ranked" ? `Nobody ${who} is on the ladder yet. Finish 5 Ranked placement games to show up here.` : `No lineups ${who} yet. Log in and finish a Daily or Ranked game to set the record. Casual, challenges and past Dailies don't count.`}</div>`;
@@ -467,7 +469,7 @@
         }</tr>`).join("")}</tbody></table>
         ${tab === "alltime" ? `<p class="lb-note">Daily and Ranked games only, one best lineup per player. Casual, challenges and past Dailies don't count. Log in to get on the board.</p>` : ""}
         ${tab === "week" ? `<p class="lb-note">Every Daily from ${shortDate(d.from)} to ${shortDate(weekEnd(d.from))} added up. Play every day to climb. Resets Tuesday.</p>` : ""}
-        ${tab === "daily" ? `<p class="lb-note">${d.players} ${group ? "in this group " : ""}played Daily #${d.number}. Everyone had the same teams, so it's ranked by points. ${past ? "Tap a player to see their lineup. Missed this one? Play it in past Dailies first." : me?.dailyDone ? "Tap a player to see their lineup." : "Finish the Daily to see everyone's lineups."}</p>` : ""}`;
+        ${tab === "daily" ? `<p class="lb-note">${d.players} ${group ? "in this group " : ""}played Daily #${d.number}. Everyone had the same teams, so it's ranked by points. ${past ? "Tap a player to see their lineup. Missed this one? Play it in past Dailies first." : me?.dailyDone ? "Tap a player to see their lineup." : "Finish the Daily to see everyone's lineups."}</p>${perfBtn}` : ""}`;
   }
   async function loadBoard() {
     const el = $("#lb"); if (!el) return;
@@ -1205,7 +1207,23 @@
         <div class="board"><div class="bulbs">${o.total.toFixed(1)}</div></div>
         <div><span class="season-badge sm ${o.record.wins === 14 ? "perfect" : ""}">${o.record.wins}-${o.record.losses} season</span> <span class="sc-acc"><b>${o.pct}%</b> accuracy</span><div class="grid">${esc(o.grid)}</div></div>
       </div>
-      <div class="turf lineup sc-lineup">${picks.map((l) => `<div class="slot f" style="--c:${tc(l.team)[0]}"><span class="s ${l.slot === "FLEX" ? "sm" : ""}">${SLOT_LABEL[l.slot]}</span><span class="p"><div class="nm"><span class="dot d-${l.grade}"></span>${esc(l.name)}</div><div class="meta">${l.season} ${esc(l.team)}</div></span><span class="pt">${Number(l.pts).toFixed(1)}</span></div>`).join("")}</div>`;
+      <div class="turf lineup sc-lineup">${picks.map((l) => `<div class="slot f" style="--c:${tc(l.team)[0]}"><span class="s ${l.slot === "FLEX" ? "sm" : ""}">${SLOT_LABEL[l.slot]}</span><span class="p"><div class="nm"><span class="dot d-${l.grade}"></span>${esc(l.name)}</div><div class="meta">${l.season} ${esc(l.team)}</div></span><span class="pt">${Number(l.pts).toFixed(1)}</span></div>`).join("")}</div>
+      ${o.perfect ? perfectHTML(o.perfect) : ""}`;
+  }
+  // the best lineup anyone could have built from that Daily's seven teams
+  function perfectHTML(p, heading = true) {
+    const rows = [...p.lineup].sort((a, b) => ORDER.indexOf(a.slot) - ORDER.indexOf(b.slot));
+    const team = (l) => l.rollKey.split("-")[1];
+    return `${heading ? `<h3 class="sc-perf-h">Perfect lineup <span>${p.total.toFixed(1)}</span></h3>` : ""}
+      <div class="turf lineup sc-lineup perf">${rows.map((l) => `<div class="slot f" style="--c:${tc(team(l))[0]}"><span class="s ${l.slot === "FLEX" ? "sm" : ""}">${SLOT_LABEL[l.slot]}</span><span class="p"><div class="nm">${esc(l.player.name)}</div><div class="meta">${l.season} ${esc(team(l))}</div></span><span class="pt">${Number(l.player.pts).toFixed(1)}</span></div>`).join("")}</div>`;
+  }
+  async function perfectSheet(date) {
+    if (!me?.signedIn) return loginSheet("Log in and finish the Daily to see its perfect lineup.");
+    if (date === me.today && !me.dailyDone) return toast("Finish today's Daily to see the perfect lineup. No spoilers.");
+    let p;
+    try { p = await api("perfect", { date }); } catch (e) { return toast(e.message); }
+    sheet(`<h2 class="sheet-h">Perfect lineup</h2><p class="sc-sub">Daily #${p.number} · ${shortDate(p.date)} · ${p.total.toFixed(1)} PPR</p>
+      <p class="hint" style="margin-top:0">The best lineup anyone could have built from that day's seven teams.</p>${perfectHTML(p, false)}`);
   }
 
   async function dayCardSheet(date) {
