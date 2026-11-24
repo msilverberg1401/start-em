@@ -234,7 +234,10 @@
       </form>`);
     let email = "";
     $("[data-google]", s.el).addEventListener("click", async () => {
-      const { error } = await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: SITE_URL } });
+      // home screen app: Google opens in Safari, so ask Safari to hand the login back (see handoff below)
+      let redirectTo = SITE_URL;
+      if (standalone()) { const hid = crypto.randomUUID(); try { localStorage.setItem("se_handoff", JSON.stringify({ id: hid, t: Date.now() })); } catch {} redirectTo = `${SITE_URL}${SITE_URL.includes("?") ? "&" : "?"}handoff=${hid}`; }
+      const { error } = await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo } });
       if (error) toast(error.message);
     });
     $("[data-email]", s.el).addEventListener("submit", async (e) => {
@@ -1658,11 +1661,45 @@
   const refreshView = () => app.querySelectorAll("[data-remind]").forEach((b) => { const box = b.closest(".remind"); const tmp = document.createElement("div"); tmp.innerHTML = reminderBar(box.classList.contains("in")); box.replaceWith(tmp.firstElementChild); wireReminder(); });
 
   window.addEventListener("hashchange", () => handleLinks());
+  // ---------- login handoff (iPhone home screen app + Google) ----------
+  // The app starts Google login with ?handoff=<random id>. Google finishes in Safari, which lands here logged in:
+  // Safari leaves its login on the server under that id, forgets it locally, and says "go back to the app".
+  // The app, meanwhile, checks for the id and logs itself in with it.
+  const pendingHandoff = () => { try { const h = JSON.parse(localStorage.getItem("se_handoff") || "null"); return h && Date.now() - h.t < 15 * 60000 ? h : null; } catch { return null; } };
+  const handoffParam = new URLSearchParams(location.search).get("handoff");
+  if (handoffParam) { try { const u = new URL(location.href); u.searchParams.delete("handoff"); history.replaceState(null, "", u.pathname + u.search + u.hash); } catch {} }
+  async function giveHandoff(s) {
+    // same place that started the login (Android, or it came straight back into the app): nothing to hand over
+    if (pendingHandoff()?.id === handoffParam) { try { localStorage.removeItem("se_handoff"); } catch {} return false; }
+    try { await api("handoffPut", { id: handoffParam, rt: s.refresh_token }); } catch { return false; }
+    await sb.auth.signOut({ scope: "local" }).catch(() => {}); // leave the login to the app; don't keep a second copy here
+    session = null;
+    app.innerHTML = `${topbar()}<div class="wrap lv"><section class="panel handoff"><div class="lv-kicker">You're in</div>
+      <h1>Logged in. Head back to the app.</h1>
+      <p>Close this page (tap <b>Done</b> at the top) and open Start 'Em from your home screen. You'll be logged in there.</p></section></div>`;
+    return true;
+  }
+  let takingHandoff = false;
+  async function takeHandoff() {
+    const h = pendingHandoff();
+    if (!h || session || takingHandoff) return;
+    takingHandoff = true;
+    try {
+      const { rt } = await api("handoffTake", { id: h.id });
+      if (rt) { localStorage.removeItem("se_handoff"); const { error } = await sb.auth.refreshSession({ refresh_token: rt }); if (error) toast("Couldn't finish logging in. Try again."); }
+    } catch {}
+    takingHandoff = false;
+  }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") takeHandoff(); });
+  setInterval(() => { if (pendingHandoff() && !session && document.visibilityState === "visible") takeHandoff(); }, 2500);
+
   // ---------- boot ----------
   // re-render only when the logged-in account actually changes (Supabase also fires SIGNED_IN on tab refocus)
   let uid;
-  sb.auth.getSession().then(({ data }) => {
+  sb.auth.getSession().then(async ({ data }) => {
     session = data.session; uid = session?.user?.id || null;
+    if (handoffParam && session && (await giveHandoff(session))) return;
+    if (!session) takeHandoff();
     home().then(() => { handleLinks(); pendingJoin(); });
     sb.auth.onAuthStateChange((_event, s) => {
       session = s;

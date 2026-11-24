@@ -234,6 +234,21 @@ const actions = {
 
   dailyStats: dailyStatsFor,
 
+  // iPhone home screen app + Google login (see migration login_handoff). Safari, now logged in, leaves its
+  // refresh token under the app's random id; the app picks it up once. The id is a secret only the app knows.
+  async handoffPut({ auth, db, body }) {
+    if (!auth) fail(401, "Log in first.");
+    const id = String(body.id || ""), rt = String(body.rt || "");
+    if (!/^[0-9a-f-]{36}$/i.test(id) || rt.length < 10 || rt.length > 500) fail(400, "Bad handoff.");
+    await db.putHandoff(id, rt);
+    return { ok: true };
+  },
+  async handoffTake({ db, body }) {
+    const id = String(body.id || "");
+    if (!/^[0-9a-f-]{36}$/i.test(id)) fail(400, "Bad handoff.");
+    return { rt: await db.takeHandoff(id) };
+  },
+
   // Attach today's Daily that was played before logging in to this account, so it counts for the standings,
   // streak and stats exactly as if they'd been logged in the whole time. One Daily per account per day still holds.
   async claimDaily({ auth, db, body }) {

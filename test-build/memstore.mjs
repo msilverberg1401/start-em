@@ -11,6 +11,8 @@ export function memStore() {
       T.profiles.set(id, { id, username }); return true;
     },
     async getGame(id) { return clone(T.games.get(id)); },
+    async putHandoff(id, rt) { (T.handoffs ||= new Map()).set(id, rt); },
+    async takeHandoff(id) { const m = T.handoffs || new Map(); const rt = m.get(id) || null; m.delete(id); return rt; },
     async getMatch(id) { return clone(T.matches.get(id) || null); },
     async insertMatch(m) { const row = { ...clone(m), id: crypto.randomUUID(), version: 0, created_at: new Date().toISOString() }; T.matches.set(row.id, row); return clone(row); },
     async saveMatch(m) { const cur = T.matches.get(m.id); if (!cur || cur.version !== m.version) return false; m.version += 1; T.matches.set(m.id, { ...cur, status: m.status, state: clone(m.state), version: m.version }); return true; },

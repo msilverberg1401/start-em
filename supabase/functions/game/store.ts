@@ -32,6 +32,12 @@ export function makeStore(sb) {
     cleanupCasual: async () => { await sb.from("games").delete().is("user_id", null).lt("created_at", new Date(Date.now() - 2 * 864e5).toISOString()); },
     getGame: (id) => one(sb.from("games").select("*").eq("id", id).maybeSingle()),
     // live matches. saveMatch only writes if nobody else saved since we read it; returns false if they did.
+    // login handoff (home screen app on iPhone). take = read once and delete; old rows are dropped.
+    putHandoff: async (id, rt) => { await sb.from("auth_handoffs").delete().lt("created_at", new Date(Date.now() - 15 * 60000).toISOString()); return one(sb.from("auth_handoffs").upsert({ id, refresh_token: rt })); },
+    async takeHandoff(id) {
+      const row = await one(sb.from("auth_handoffs").delete().eq("id", id).gte("created_at", new Date(Date.now() - 15 * 60000).toISOString()).select("refresh_token").maybeSingle());
+      return row?.refresh_token || null;
+    },
     getMatch: (id) => one(sb.from("matches").select("*").eq("id", id).maybeSingle()),
     insertMatch: (m) => one(sb.from("matches").insert(m).select().single()),
     async saveMatch(m) {

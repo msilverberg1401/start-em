@@ -1153,3 +1153,6 @@ html[data-theme="dark"] .matchup .mrow .yr { color: #56667D; }
   .lv-count-num { font-size: 110px; }
 }
 @media (prefers-reduced-motion: reduce) { .lv-pk, .lv-count-num, .lv-dots i, .lv-timer.hurry span { animation: none; } }
+/* Safari page after a Google login started from the home screen app */
+.handoff { max-width: 620px; margin: 28px auto 0; padding: 26px; }
+.handoff p { color: var(--ink-2); font-size: 16px; line-height: 1.5; margin: 0; }
