@@ -383,7 +383,7 @@ const actions = {
       const date = body.date || todayET();
       if (!validDate(date) || date > todayET()) fail(400, "Pick a Daily that's already out.");
       const { rows, count } = await db.dailyTop(date, 10, ids);
-      return { board, date, number: dailyNumber(date), players: count, rows: rows.map((x) => ({ ...x, record: recStr(x.total, x) })) };
+      return { board, date, number: dailyNumber(date), players: count, canReveal: !!auth && !!(await finishedDayGame(db, auth.id, date)), rows: rows.map((x) => ({ ...x, record: recStr(x.total, x) })) };
     }
     if (board === "week") {
       const today = todayET(), from = weekStart(today);
