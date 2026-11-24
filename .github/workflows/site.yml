@@ -40,5 +40,8 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with: { path: site }
+      # GitHub sometimes can't see a just-uploaded artifact yet; a short pause avoids "No artifacts named github-pages"
+      - name: Give GitHub a moment to register the upload
+        run: sleep 20
       - id: deploy
         uses: actions/deploy-pages@v4
