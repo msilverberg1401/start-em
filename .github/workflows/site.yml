@@ -4,6 +4,9 @@ on:
     branches: [main]
     paths: ["site/**", ".github/workflows/site.yml"]
   workflow_dispatch:
+  # redeploy just after midnight Eastern so theme-day link previews switch on and off by themselves
+  schedule:
+    - cron: "7 5 * * *"
 permissions:
   contents: read
   pages: write
@@ -32,6 +35,14 @@ jobs:
           URL="${{ vars.SITE_URL }}"
           [ -n "$URL" ] && case "$URL" in */) ;; *) URL="$URL/";; esac
           sed -i "s#%SITE_URL%#${URL}#g" site/index.html
+      - name: Theme-day link preview image (Thanksgiving)
+        run: |
+          TODAY=$(TZ=America/New_York date +%F); Y=${TODAY:0:4}
+          D=$(date -d "$Y-11-01" +%u); OFF=$(( (4 - D + 7) % 7 )); TG=$(printf "%s-11-%02d" "$Y" $((1 + OFF + 21)))
+          if [ "$TODAY" = "$TG" ]; then
+            sed -i 's#og-image\.png#og-image-thanksgiving.png#g' site/index.html
+            echo "Thanksgiving: using og-image-thanksgiving.png"
+          fi
       - name: Version the CSS and JS so browsers fetch new copies after each deploy
         run: |
           V="${GITHUB_SHA::8}"
