@@ -1233,3 +1233,41 @@ html[data-day="thanksgiving"] .tg-ticket {
   html[data-day="thanksgiving"] .tg-ticket { transform: none; max-width: 460px; }
 }
 @media (max-width: 640px) { .tg-match { font-size: 36px; } }
+
+/* ---- Thanksgiving leaves ---- */
+.tg-leaf { display: block; fill: var(--lc); }
+.tg-leaf .v { fill: none; stroke: rgba(255, 240, 215, .55); stroke-width: 2.2; stroke-linecap: round; }
+.tg-leaf path:first-child { filter: drop-shadow(0 2px 1.5px rgba(60, 25, 5, .25)); }
+
+/* leaves piled behind the ticket */
+.tg-ticket-wrap { display: none; }
+html[data-day="thanksgiving"] .tg-ticket-wrap { display: block; position: relative; align-self: center; padding: 26px 8px 18px; }
+.tg-ticket-wrap .tg-ticket { position: relative; z-index: 1; }
+.tg-cluster { position: absolute; inset: 0; pointer-events: none; }
+.tg-cluster .tg-leaf { position: absolute; }
+.tg-cluster .c1 { width: 92px; top: -14px; right: -30px; transform: rotate(28deg); }
+.tg-cluster .c2 { width: 74px; top: -22px; right: 46px; transform: rotate(-22deg); }
+.tg-cluster .c3 { width: 58px; bottom: -14px; left: -22px; transform: rotate(-58deg); }
+.tg-cluster .c4 { width: 64px; bottom: -20px; right: 8px; transform: rotate(142deg); }
+.tg-cluster .c5 { width: 48px; top: 30%; left: -34px; transform: rotate(-110deg); }
+.tg-cluster .c1, .tg-cluster .c4 { z-index: 2; } /* a couple of leaves sit on top of the ticket */
+
+/* sprig on the Daily card header */
+.tg-sprig { display: inline-flex; align-items: flex-end; margin: 0 auto 0 10px; height: 30px; }
+.tg-sprig .tg-leaf { width: 22px; margin-left: -6px; }
+.tg-sprig .s1 { transform: rotate(-28deg); } .tg-sprig .s2 { width: 26px; transform: rotate(6deg) translateY(-3px); } .tg-sprig .s3 { transform: rotate(38deg); }
+
+/* a few leaves drifting down the home page */
+.tg-sky { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 5; }
+.tg-fall { position: absolute; top: -50px; animation: tgfall var(--d) linear var(--dl) infinite; }
+.tg-fall .tg-leaf { animation: tgsway calc(var(--d) / 4) ease-in-out var(--dl) infinite alternate; opacity: .8; }
+@keyframes tgfall { to { transform: translateY(calc(100vh + 100px)); } }
+@keyframes tgsway {
+  from { transform: translateX(calc(var(--sw) * -1)) rotate(var(--r)); }
+  to { transform: translateX(var(--sw)) rotate(calc(var(--r) + 70deg)); }
+}
+@media (prefers-reduced-motion: reduce) { .tg-sky { display: none; } }
+@media (max-width: 900px) {
+  html[data-day="thanksgiving"] .tg-ticket-wrap { max-width: 460px; }
+  .tg-cluster .c1 { width: 70px; right: -12px; } .tg-cluster .c5 { display: none; }
+}

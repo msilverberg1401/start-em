@@ -316,6 +316,28 @@
   const saveMe = (m) => { try { if (m?.admin) localStorage.setItem("se_nt", "1"); localStorage.setItem(ME_KEY, JSON.stringify({ uid: session?.user?.id || null, today: todayET(), me: m })); } catch {} };
   const todayET = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
   let homeSeq = 0;
+
+  // ---------- Thanksgiving decorations (hand-drawn SVG leaves) ----------
+  const TG_LEAF = {
+    maple: `<path d="M50 4 57 22 68 16 64 38 82 28 78 40 94 42 80 54 86 60 64 64 66 76 54 70 51.5 96h-3L46 70 34 76 36 64 14 60 20 54 6 42 22 40 18 28 36 38 32 16 43 22Z"/><path class="v" d="M50 92V20M50 62 70 46M50 62 30 46M50 74 62 66M50 74 38 66"/>`,
+    oak: `<path d="M48.5 96V80C38 82 30 76 34 68 24 70 18 62 26 56 16 54 14 44 24 42 18 34 24 26 32 30 30 20 38 14 44 20 44 10 50 4 50 4S56 10 56 20C62 14 70 20 68 30 76 26 82 34 76 42 86 44 84 54 74 56 82 62 76 70 66 68 70 76 62 82 51.5 80V96Z"/><path class="v" d="M50 82V14M50 36 62 28M50 36 38 28M50 52 66 46M50 52 34 46M50 66 62 62M50 66 38 62"/>`,
+    birch: `<path d="M48.5 96V84C24 70 22 34 50 6 78 34 76 70 51.5 84V96Z"/><path class="v" d="M50 84V14M50 34 62 26M50 34 38 26M50 50 64 42M50 50 36 42M50 64 60 58M50 64 40 58"/>`,
+  };
+  const TG_COLORS = ["#B8431B", "#D9741E", "#E6A532", "#8E2F17", "#C25A16", "#A8781C"];
+  const tgLeaf = (kind, color, cls = "", style = "") => `<svg class="tg-leaf ${cls}" viewBox="0 0 100 100" style="--lc:${color};${style}" aria-hidden="true">${TG_LEAF[kind]}</svg>`;
+  function tgFalling() {
+    const kinds = ["maple", "oak", "birch"];
+    let out = "";
+    for (let i = 0; i < 11; i++) {
+      const size = 18 + ((i * 7) % 18), left = (i * 9.3 + 4) % 100, dur = 16 + ((i * 5) % 11), delay = -((i * 3.7) % dur);
+      out += `<span class="tg-fall" style="left:${left}%;--d:${dur}s;--dl:${delay}s;--sw:${14 + (i % 4) * 8}px">${tgLeaf(kinds[i % 3], TG_COLORS[i % TG_COLORS.length], "", `width:${size}px;height:${size}px;--r:${(i * 47) % 360}deg`)}</span>`;
+    }
+    return `<div class="tg-sky" aria-hidden="true">${out}</div>`;
+  }
+  const tgCluster = () => `<div class="tg-cluster" aria-hidden="true">
+    ${tgLeaf("maple", "#B8431B", "c1")}${tgLeaf("oak", "#D9741E", "c2")}${tgLeaf("birch", "#E6A532", "c3")}${tgLeaf("maple", "#8E2F17", "c4")}${tgLeaf("oak", "#A8781C", "c5")}
+  </div>`;
+  const tgSprig = () => `<span class="tg-sprig" aria-hidden="true">${tgLeaf("oak", "#D9741E", "s1")}${tgLeaf("maple", "#B8431B", "s2")}${tgLeaf("birch", "#E6A532", "s3")}</span>`;
   async function home() {
     stopLive();
     game = null; selected = null;
@@ -355,6 +377,7 @@
     const stats = casualStats();
     app.innerHTML = `
     ${topbar()}
+    ${tg ? tgFalling() : ""}
     <div class="wrap">
       <section class="hero">
         <div>
@@ -366,19 +389,19 @@
           </div>
           ${me.signedIn && me.username ? pulse() : ""}
         </div>
-        ${tg ? `<aside class="tg-ticket" aria-label="Thanksgiving Daily">
+        ${tg ? `<div class="tg-ticket-wrap">${tgCluster()}<aside class="tg-ticket" aria-label="Thanksgiving Daily">
           <div class="tg-stub"><span>Daily</span><b>#${me.dailyNumber}</b></div>
           <div class="tg-main">
             <div class="tg-eyebrow">Thanksgiving · ${new Date(`${me.today}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
             <div class="tg-match"><span class="tg-det">Lions</span><i>&</i><span class="tg-dal">Cowboys</span></div>
             <p>Every roll today is a Detroit or Dallas season from 1999 on. Seven teams, one look each.</p>
           </div>
-        </aside>` : ""}
+        </aside></div>` : ""}
       </section>
 
       <div class="modes">
         <button class="mode daily" ${dailyBtn}>
-          <div class="ph"><h3>Daily</h3><span class="aside">${me.theme ? "Theme day" : "Once a day"}</span></div>
+          <div class="ph"><h3>Daily</h3>${tg ? tgSprig() : ""}<span class="aside">${me.theme ? "Theme day" : "Once a day"}</span></div>
           ${me.theme ? `<div class="theme-tag">${esc(me.theme.name)}</div>` : ""}
           <p>${me.theme ? `${esc(me.theme.desc)} ` : ""}Same seven teams for everyone today, no rerolls. One shot. Top 10 make the board.</p>
           <div class="foot">${dailyDone ? `<span>Played: ${dailyDone.pct}%${me.streak?.current ? ` · ${me.streak.current}-day streak` : ""}</span><span>Next in ${untilMidnightET()}</span><em>Your card</em>` : gd?.done ? `<span>You scored ${Number(gd.total).toFixed(1)}. Not on the board yet.</span><em>Save it</em>` : `<span>${me.dailyActive || gd ? "In progress" : me.streak?.current ? `${me.streak.current}-day streak. Keep it going.` : `Daily #${me.dailyNumber ?? ""}`}</span><em>${me.dailyActive || gd ? "Resume" : "Play"}</em>`}</div>
