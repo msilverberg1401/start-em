@@ -2,6 +2,29 @@
 window.StartEmShare = (() => {
   const C = { navy: "#0D1A2B", ink: "#0B1220", ink3: "#7B889C", steel: "#A9B7CB", yel: "#FFD93D", turf: "#17603A", turf2: "#1A6B41", board: "#07101C", dots: "#16233A", best: "#12B76A", close: "#D99B00", miss: "#E5383B" };
   const GRADE = { best: C.best, close: C.close, miss: C.miss };
+  // Thanksgiving Daily: harvest colors + hand-drawn leaves (same shapes as the site). Other days use the normal look.
+  const BASE = { ...C };
+  const TG = { navy: "#231A14", yel: "#F0A23B", board: "#160F0B", dots: "#2E2219", steel: "#DCC5A6" };
+  const isTG = (game) => game.theme?.key === "thanksgiving";
+  const palette = (game) => Object.assign(C, BASE, isTG(game) ? TG : {});
+  const LEAF = {
+    maple: ["M50 4 57 22 68 16 64 38 82 28 78 40 94 42 80 54 86 60 64 64 66 76 54 70 51.5 96h-3L46 70 34 76 36 64 14 60 20 54 6 42 22 40 18 28 36 38 32 16 43 22Z", "M50 92V20M50 62 70 46M50 62 30 46M50 74 62 66M50 74 38 66"],
+    oak: ["M48.5 96V80C38 82 30 76 34 68 24 70 18 62 26 56 16 54 14 44 24 42 18 34 24 26 32 30 30 20 38 14 44 20 44 10 50 4 50 4S56 10 56 20C62 14 70 20 68 30 76 26 82 34 76 42 86 44 84 54 74 56 82 62 76 70 66 68 70 76 62 82 51.5 80V96Z", "M50 82V14M50 36 62 28M50 36 38 28M50 52 66 46M50 52 34 46M50 66 62 62M50 66 38 62"],
+    birch: ["M48.5 96V84C24 70 22 34 50 6 78 34 76 70 51.5 84V96Z", "M50 84V14M50 34 62 26M50 34 38 26M50 50 64 42M50 50 36 42M50 64 60 58M50 64 40 58"],
+  };
+  function leaf(ctx, kind, x, y, size, deg, color) {
+    const [body, veins] = LEAF[kind];
+    ctx.save(); ctx.translate(x, y); ctx.rotate((deg * Math.PI) / 180); ctx.scale(size / 100, size / 100); ctx.translate(-50, -50);
+    ctx.shadowColor = "rgba(40,15,0,.35)"; ctx.shadowBlur = 8; ctx.shadowOffsetY = 3;
+    ctx.fillStyle = color; ctx.fill(new Path2D(body));
+    ctx.shadowColor = "transparent";
+    ctx.strokeStyle = "rgba(255,240,215,.6)"; ctx.lineWidth = 2.4; ctx.lineCap = "round"; ctx.stroke(new Path2D(veins));
+    ctx.restore();
+  }
+  // a pile of leaves; spots are [kind, dx, dy, size, angle, color]
+  const pile = (ctx, x, y, k, spots) => spots.forEach(([kind, dx, dy, sz, a, col]) => leaf(ctx, kind, x + dx * k, y + dy * k, sz * k, a, col));
+  const CORNER = [["oak", -70, 6, 92, -24, "#D9741E"], ["maple", 0, -4, 118, 22, "#B8431B"], ["birch", -128, 30, 64, -62, "#E6A532"], ["maple", -40, 58, 70, 150, "#8E2F17"]];
+  const SPRIG = [["oak", -34, 0, 56, -30, "#D9741E"], ["maple", 0, -6, 66, 8, "#B8431B"], ["birch", 34, 2, 50, 40, "#E6A532"]];
   const LABEL = { QB: "QB", RB1: "RB", RB2: "RB", WR1: "WR", WR2: "WR", TE: "TE", FLEX: "FLEX" };
   const ORDER = ["QB", "RB1", "RB2", "WR1", "WR2", "TE", "FLEX"];
   const DISP = '"Saira Condensed", "Arial Narrow", sans-serif', BODY = '"Inter Tight", system-ui, sans-serif', DOTS = '"Doto", "Courier New", monospace';
@@ -41,7 +64,8 @@ window.StartEmShare = (() => {
 
   async function draw({ game, url, teamColors }) {
     await fonts();
-    const r = game.result, W = 1080, H = 1350;
+    const r = game.result, W = 1080, H = 1350, tg = isTG(game);
+    palette(game);
     const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
     const ctx = cv.getContext("2d");
 
@@ -61,7 +85,11 @@ window.StartEmShare = (() => {
     ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
     fieldLogo(ctx, 60, 30, 68);
     ctx.textAlign = "right"; ctx.fillStyle = C.steel; ctx.font = `800 40px ${DISP}`;
-    ctx.fillText(game.mode === "daily" ? `DAILY #${game.number}` : game.mode === "archive" ? `PAST DAILY #${game.number}` : game.mode === "ranked" ? "RANKED" : game.mode === "challenge" ? "CHALLENGE" : "CASUAL", W - 60, 98);
+    if (tg) {
+      ctx.fillText(`DAILY #${game.number}`, W - 190, 82);
+      ctx.fillStyle = C.yel; ctx.font = `italic 900 30px ${DISP}`; ctx.fillText("THANKSGIVING", W - 190, 118);
+      pile(ctx, W - 30, 34, 1.05, CORNER);
+    } else ctx.fillText(game.mode === "daily" ? `DAILY #${game.number}` : game.mode === "archive" ? `PAST DAILY #${game.number}` : game.mode === "ranked" ? "RANKED" : game.mode === "challenge" ? "CHALLENGE" : "CASUAL", W - 60, 98);
 
     // ---- scoreboard row ----
     const sy = 192, sh = 214;
@@ -110,6 +138,7 @@ window.StartEmShare = (() => {
     ctx.textAlign = "left"; ctx.fillStyle = C.yel; ctx.font = `italic 900 46px ${DISP}`; ctx.fillText("CAN YOU BEAT IT?", 60, FB + 72);
     ctx.textAlign = "right"; ctx.fillStyle = "#fff"; ctx.font = `700 30px ${BODY}`;
     ctx.fillText(fit(ctx, url.replace(/^https?:\/\//, "").replace(/\/$/, ""), 480), W - 60, FB + 70);
+    if (tg) pile(ctx, 610, FB + 54, 0.9, SPRIG);
 
     return new Promise((res) => cv.toBlob((b) => res({ blob: b, dataUrl: cv.toDataURL("image/png") }), "image/png"));
   }
@@ -130,7 +159,8 @@ window.StartEmShare = (() => {
     const type = videoType();
     if (!type) throw new Error("This browser can't make videos. Try Chrome or Safari.");
     await fonts();
-    const r = game.result, W = 1080, H = 1920, FPS = 30, DUR = 9.2;
+    const r = game.result, W = 1080, H = 1920, FPS = 30, DUR = 9.2, tg = isTG(game);
+    palette(game);
     const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
     const ctx = cv.getContext("2d");
     const picks = game.picks; // in the order they were picked: that's the story
@@ -150,6 +180,7 @@ window.StartEmShare = (() => {
       ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
       fieldLogo(ctx, 70, 66, 100);
       ctx.fillStyle = C.steel; ctx.font = `800 44px ${DISP}`; ctx.fillText(fit(ctx, modeLine, W - 140), 70, 248);
+      if (tg) pile(ctx, W - 50, 60, 1.25, CORNER);
 
       // scoreboard: running total
       const landed = picks.filter((_, i) => t >= T0 + i * STEP + 0.45);
@@ -197,11 +228,12 @@ window.StartEmShare = (() => {
       slant(ctx, 0, FB, W * 0.42, 10, 10, C.yel);
       ctx.textAlign = "left"; ctx.fillStyle = C.yel; ctx.font = `italic 900 64px ${DISP}`; ctx.fillText("CAN YOU BEAT IT?", 70, FB + 110);
       ctx.fillStyle = "#fff"; ctx.font = `700 44px ${BODY}`; ctx.fillText(site, 70, FB + 180);
+      if (tg) pile(ctx, W - 150, FB + 120, 1.3, SPRIG);
 
       // intro title over everything for the first second
       if (t < T0) {
         const a = t < 0.65 ? 1 : 1 - (t - 0.65) / (T0 - 0.65);
-        ctx.fillStyle = `rgba(13,26,43,${0.82 * a})`; ctx.fillRect(0, FT, W, FB - FT);
+        ctx.fillStyle = tg ? `rgba(35,26,20,${0.84 * a})` : `rgba(13,26,43,${0.82 * a})`; ctx.fillRect(0, FT, W, FB - FT);
         ctx.globalAlpha = a; ctx.textAlign = "center"; ctx.fillStyle = "#fff"; ctx.font = `italic 900 120px ${DISP}`;
         ctx.fillText("WHO ARE YOU", W / 2, FT + 440); ctx.fillStyle = C.yel; ctx.fillText("STARTING?", W / 2, FT + 570); ctx.globalAlpha = 1;
       }
