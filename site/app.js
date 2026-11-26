@@ -348,13 +348,17 @@
     const dailyDone = me.dailyDone, rk = me.ranked;
     const gd = !me.signedIn ? guestDaily() : null; // Daily played without an account today
     const dailyBtn = dailyDone ? "data-daycard" : gd?.done ? "data-savescore" : `data-mode="daily"`;
+    // theme days can reskin the site (only Thanksgiving has a look so far)
+    const day = me.theme?.key || "";
+    if (day === "thanksgiving") document.documentElement.dataset.day = day; else delete document.documentElement.dataset.day;
+    const tg = day === "thanksgiving";
     const stats = casualStats();
     app.innerHTML = `
     ${topbar()}
     <div class="wrap">
       <section class="hero">
         <div>
-          <h1><span class="k">Seven random NFL teams. Seven picks.</span>Who are you <span class="hl">starting?</span></h1>
+          <h1><span class="k">${tg ? "Thanksgiving Daily · Lions & Cowboys only" : "Seven random NFL teams. Seven picks."}</span>Who are you <span class="hl">starting?</span></h1>
           <p>Every roll hands you a team from a random season, 1999 to 2025. Start one player, then find out what he really scored in full PPR. Build the best lineup in history.</p>
           <div class="hero-cta">
             <button class="btn yel big" ${dailyBtn}>${dailyDone ? `See your Daily #${me.dailyNumber} card` : gd?.done ? `Log in to save your Daily #${me.dailyNumber} score` : me.dailyActive || gd ? `Resume Daily #${me.dailyNumber}` : `Play Daily #${me.dailyNumber ?? ""}`}</button>
@@ -362,6 +366,14 @@
           </div>
           ${me.signedIn && me.username ? pulse() : ""}
         </div>
+        ${tg ? `<aside class="tg-ticket" aria-label="Thanksgiving Daily">
+          <div class="tg-stub"><span>Daily</span><b>#${me.dailyNumber}</b></div>
+          <div class="tg-main">
+            <div class="tg-eyebrow">Thanksgiving · ${new Date(`${me.today}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
+            <div class="tg-match"><span class="tg-det">Lions</span><i>&</i><span class="tg-dal">Cowboys</span></div>
+            <p>Every roll today is a Detroit or Dallas season from 1999 on. Seven teams, one look each.</p>
+          </div>
+        </aside>` : ""}
       </section>
 
       <div class="modes">

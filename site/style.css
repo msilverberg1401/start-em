@@ -1156,3 +1156,80 @@ html[data-theme="dark"] .matchup .mrow .yr { color: #56667D; }
 /* Safari page after a Google login started from the home screen app */
 .handoff { max-width: 620px; margin: 28px auto 0; padding: 26px; }
 .handoff p { color: var(--ink-2); font-size: 16px; line-height: 1.5; margin: 0; }
+
+/* ================= Thanksgiving look (html[data-day="thanksgiving"]) =================
+   Harvest palette: cream page, espresso bars, pumpkin-gold accent. The header stripe and the
+   ticket carry the day's matchup (Lions Honolulu blue, Cowboys navy and silver). */
+html[data-day="thanksgiving"] {
+  --page: #F4EEE4;
+  --surface: #FFFCF7;
+  --line: #E4D9C8;
+  --line-2: #EEE6D9;
+  --ink: #1D1712;
+  --ink-2: #5B4D40;
+  --ink-3: #8E7F70;
+  --navy: #231A14;
+  --navy-2: #3A2B21;
+  --solid: #231A14;
+  --yel: #F0A23B;
+  --bulb: #FFC56B;
+  --tg-det: #0076B6;
+  --tg-dal: #041E42;
+  --tg-silver: #A5ACAF;
+  --tg-crust: #C98A44;
+}
+html[data-day="thanksgiving"][data-theme="dark"] {
+  --page: #120D0A;
+  --surface: #1E1712;
+  --line: #3A2E24;
+  --line-2: #2A2119;
+  --ink: #F3EADF;
+  --ink-2: #CDBDAA;
+  --ink-3: #9C8A77;
+  --navy: #1A120D;
+  --navy-2: #33251B;
+  --solid: #4A3526;
+  --tg-dal: #8FA6C6;
+}
+/* header stripe: pumpkin, then the two teams */
+html[data-day="thanksgiving"] .appbar::after {
+  background: linear-gradient(90deg, var(--yel) 0 30%, var(--tg-det) 30% 34%, var(--tg-silver) 34% 36%, var(--tg-dal) 36% 40%, transparent 40%);
+}
+html[data-day="thanksgiving"] .hero h1 .k { color: var(--tg-crust); letter-spacing: .01em; }
+html[data-day="thanksgiving"] .hero { grid-template-columns: minmax(0, 1fr) 340px; }
+
+/* the ticket */
+.tg-ticket { display: none; }
+html[data-day="thanksgiving"] .tg-ticket {
+  display: grid; grid-template-columns: 74px 1fr; align-self: center;
+  background: var(--surface); border-radius: 10px; box-shadow: var(--shadow), inset 0 0 0 1px var(--line);
+  transform: rotate(1.5deg); position: relative; overflow: hidden;
+}
+/* perforation between stub and body: punched half-circles + a dashed tear line */
+.tg-ticket::before {
+  content: ""; position: absolute; left: 74px; top: 0; bottom: 0; width: 0; border-left: 2px dashed var(--line);
+}
+.tg-ticket::after {
+  content: ""; position: absolute; left: 63px; top: -11px; bottom: -11px; width: 22px;
+  background: radial-gradient(circle at 11px 11px, var(--page) 10px, transparent 10.5px) top / 22px 100% no-repeat,
+              radial-gradient(circle at 11px calc(100% - 11px), var(--page) 10px, transparent 10.5px) bottom / 22px 100% no-repeat;
+}
+.tg-stub { background: var(--navy); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 18px 0; }
+.tg-stub span { font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--bulb); writing-mode: vertical-rl; transform: rotate(180deg); }
+.tg-stub b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 30px; line-height: 1; margin-top: 8px; }
+.tg-main { padding: 18px 20px 18px 22px; min-width: 0; }
+.tg-eyebrow { font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--tg-crust); }
+.tg-match { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; margin: 6px 0 10px; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 42px; line-height: .92; text-transform: uppercase; }
+.tg-match .tg-dal { flex-basis: 100%; }
+.tg-match i { font-size: 30px; color: var(--ink-3); font-style: italic; }
+.tg-det { color: var(--tg-det); }
+.tg-dal { color: var(--tg-dal); }
+.tg-main p { margin: 0; font-size: 14.5px; line-height: 1.45; color: var(--ink-2); }
+/* pie-crust edge along the bottom of the ticket */
+.tg-main { background: radial-gradient(circle at 9px 100%, var(--tg-crust) 5px, transparent 5.5px) bottom left / 18px 7px repeat-x; padding-bottom: 24px; }
+
+@media (max-width: 900px) {
+  html[data-day="thanksgiving"] .hero { grid-template-columns: 1fr; }
+  html[data-day="thanksgiving"] .tg-ticket { transform: none; max-width: 460px; }
+}
+@media (max-width: 640px) { .tg-match { font-size: 36px; } }
